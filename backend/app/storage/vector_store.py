@@ -26,10 +26,17 @@ class QdrantVectorStore:
     """
 
     def __init__(self) -> None:
-        self.client = AsyncQdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port,
-        )
+        if settings.qdrant_url:
+            self.client = AsyncQdrantClient(
+                url=settings.qdrant_url,
+                api_key=settings.qdrant_api_key,
+            )
+        else:
+            self.client = AsyncQdrantClient(
+                host=settings.qdrant_host,
+                port=settings.qdrant_port,
+                api_key=settings.qdrant_api_key,
+            )
         self.collection_chunks = settings.qdrant_collection_chunks
         self.collection_memories = settings.qdrant_collection_memories
         self.dims = settings.embedding_dimensions

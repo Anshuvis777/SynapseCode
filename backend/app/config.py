@@ -63,9 +63,11 @@ class Settings(BaseSettings):
     celery_broker_url: str = Field(default="redis://localhost:6379/1")
     celery_result_backend: str = Field(default="redis://localhost:6379/2")
 
-    # ── Qdrant (free, self-hosted) ──────────────────────────────
+    # ── Qdrant (self-hosted or Qdrant Cloud) ───────────────────
     qdrant_host: str = Field(default="localhost")
     qdrant_port: int = Field(default=6333)
+    qdrant_url: str | None = Field(default=None)
+    qdrant_api_key: str | None = Field(default=None)
     qdrant_collection_chunks: str = Field(default="code_chunks")
     qdrant_collection_memories: str = Field(default="memories")
 
