@@ -32,7 +32,8 @@ class OpenAIProvider(LLMProvider):
     """
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._client = AsyncOpenAI(api_key=api_key or settings.openai_api_key)
+        key = api_key or settings.openai_api_key or "sk-byok_placeholder"
+        self._client = AsyncOpenAI(api_key=key)
         self._model = settings.openai_llm_model
         self._default_temperature = settings.llm_temperature
         self._default_max_tokens = settings.llm_max_tokens

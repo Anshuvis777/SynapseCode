@@ -36,8 +36,9 @@ class GroqProvider(LLMProvider):
     """
 
     def __init__(self, api_key: str | None = None) -> None:
+        key = api_key or settings.groq_api_key or "gsk_byok_placeholder"
         self._client = AsyncOpenAI(
-            api_key=api_key or settings.groq_api_key,
+            api_key=key,
             base_url=settings.groq_base_url,
         )
         self._model = settings.groq_llm_model
@@ -141,6 +142,9 @@ class GroqProvider(LLMProvider):
 
     async def health_check(self) -> bool:
         """Verify Groq API is reachable by making a minimal request."""
+        if not settings.groq_api_key:
+            # Server runs in Zero-Retention BYOK mode (keys supplied per-request by client)
+            return True
         try:
             await self._client.chat.completions.create(
                 model=self._model,
