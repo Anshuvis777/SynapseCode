@@ -73,7 +73,7 @@ export const Documents: React.FC = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Remove ${name} from DevAssist knowledge index?`)) {
+    if (confirm(`Remove ${name} from CodexRAG knowledge index?`)) {
       deleteDocument(id);
       toast('Document Deleted', {
         description: `${name} has been removed from context indices.`,
@@ -241,6 +241,18 @@ export const Documents: React.FC = () => {
                                   <div 
                                     className="bg-blue-500 h-full transition-all duration-300"
                                     style={{ width: `${doc.uploadProgress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : doc.status === 'processing' ? (
+                              <div className="space-y-1 w-20">
+                                <span className="text-[9.5px] font-bold text-amber-400 animate-pulse">
+                                  Embedding...
+                                </span>
+                                <div className="h-1 bg-zinc-950 border border-zinc-850 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-amber-500 h-full animate-pulse"
+                                    style={{ width: '100%' }}
                                   />
                                 </div>
                               </div>

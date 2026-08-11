@@ -41,6 +41,7 @@ AsyncSessionLocal = async_sessionmaker(
 # ── Base class for all ORM models ───────────────────────────────
 class Base(DeclarativeBase):
     """Declarative base — all models inherit from this."""
+
     pass
 
 

@@ -6,15 +6,16 @@ always use the same database as the app.
 """
 
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config, pool
+
+# Import all models to register them with Base.metadata
+import app.models  # noqa: F401 — side-effect import triggers model registration
 from alembic import context
 
 # Load app config and models
 from app.config import settings
 from app.storage.database import Base
-
-# Import all models to register them with Base.metadata
-import app.models  # noqa: F401 — side-effect import triggers model registration
 
 # Alembic Config object
 config = context.config
@@ -28,6 +29,7 @@ if config.config_file_name is not None:
         fileConfig(config.config_file_name)
     except Exception:
         import logging
+
         logging.basicConfig(level=logging.INFO)
 
 # Target metadata for autogenerate
@@ -66,8 +68,8 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            compare_type=True,           # Detect column type changes
-            compare_server_default=True, # Detect default value changes
+            compare_type=True,  # Detect column type changes
+            compare_server_default=True,  # Detect default value changes
         )
 
         with context.begin_transaction():

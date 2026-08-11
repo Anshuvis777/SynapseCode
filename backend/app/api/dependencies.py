@@ -7,16 +7,15 @@ that validates the JWT on every protected request.
 
 import uuid
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.storage.database import get_db
-from app.utils.security import decode_token
 from app.utils.logger import get_logger
-
-import jwt
+from app.utils.security import decode_token
 
 logger = get_logger(__name__)
 

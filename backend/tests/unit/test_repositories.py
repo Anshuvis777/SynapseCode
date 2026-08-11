@@ -47,16 +47,16 @@ async def test_create_repository_success(mock_task, client, mock_user, db_sessio
         "name": "new-repo",
         "url": "https://github.com/my/new-repo",
         "source_type": "github",
-        "description": "Some description"
+        "description": "Some description",
     }
 
     response = await client.post("/api/repos", json=payload)
-    
+
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data["name"] == "new-repo"
     assert data["status"] == "pending"
-    
+
     # Verify celery task was dispatched
     mock_task.delay.assert_called_once()
 
@@ -86,7 +86,7 @@ async def test_list_repositories(client, mock_user, db_session, override_auth):
     await db_session.flush()
 
     response = await client.get("/api/repos")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert len(data) == 1
@@ -118,10 +118,10 @@ async def test_delete_repository(mock_vector_store, client, mock_user, db_sessio
     with patch("app.api.repositories.shutil.rmtree") as mock_rmtree:
         response = await client.delete(f"/api/repos/{mock_repo.id}")
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        
+
         # Verify vector store delete called
         mock_vector_store.delete_by_repository.assert_called_once_with(mock_user.id, mock_repo.id)
-        
+
         # Query DB to check if repo was deleted
         query = select(Repository).where(Repository.id == mock_repo.id)
         repo = await db_session.scalar(query)

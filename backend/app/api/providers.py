@@ -8,9 +8,9 @@ Useful for debugging configuration issues.
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import get_current_user
-from app.models.user import User
-from app.providers.factory import get_llm_provider, get_embedding_provider
 from app.config import settings
+from app.models.user import User
+from app.providers.factory import get_embedding_provider, get_llm_provider
 
 router = APIRouter()
 

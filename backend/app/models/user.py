@@ -2,21 +2,19 @@
 DevAssist AI — User ORM Model
 """
 
-import uuid
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Boolean, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.mixins import TimestampMixin, UUIDMixin
 from app.storage.database import Base
-from app.models.mixins import UUIDMixin, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.session import Session
-    from app.models.repository import Repository
     from app.models.document import Document
     from app.models.memory import Memory
+    from app.models.repository import Repository
+    from app.models.session import Session
 
 
 class User(UUIDMixin, TimestampMixin, Base):
@@ -26,9 +24,7 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
-    )
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

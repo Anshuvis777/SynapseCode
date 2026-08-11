@@ -2,256 +2,222 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   GitBranch, 
-  FileText, 
-  Brain, 
-  MessageSquare, 
-  Cpu, 
-  Settings as SettingsIcon,
-  Search,
-  ArrowRight,
-  Database,
-  Zap
+  RotateCw, 
+  Trash2, 
+  Plus
 } from 'lucide-react';
 import { useRepositoryStore } from '../store/repositoryStore';
 import { useChatStore } from '../store/chatStore';
-import { useSettingsStore } from '../store/settingsStore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { useUserStore } from '../store/userStore';
 
 export const DashboardOverview: React.FC = () => {
   const navigate = useNavigate();
-  const { repositories, documents } = useRepositoryStore();
-  const { sessions, memories, createSession } = useChatStore();
-  const { settings } = useSettingsStore();
+  const { user } = useUserStore();
+  const { repositories, documents, deleteRepo, reindexRepo, activeRepositoryId } = useRepositoryStore();
+  const { memories } = useChatStore();
+
+  const activeRepo = repositories.find(r => r.id === activeRepositoryId);
+  const workspaceTitle = activeRepo ? `${activeRepo.name}` : (user?.name ? `${user.name}'s Workspace` : 'Primary Workspace');
 
   const indexedRepos = repositories.filter(r => r.status === 'indexed');
   const indexingRepos = repositories.filter(r => r.status === 'indexing');
 
-  const handleStartChat = () => {
-    createSession(repositories[0]?.id);
-    navigate('/chat');
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this repository and its vector embeddings?")) {
+      await deleteRepo(id);
+    }
+  };
+
+  const handleReindex = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await reindexRepo(id);
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-6 h-full overflow-y-auto">
+    <div className="p-6 md:p-8 space-y-8 h-full overflow-y-auto bg-[#060608]">
       
       {/* Page Header */}
-      <div>
-        <h1 className="text-xl font-extrabold tracking-tight text-zinc-50">Developer Workspace</h1>
-        <p className="text-xs text-zinc-400 mt-1">
-          Monitor your semantic codebase indices, active agent logs, and connected documentation.
-        </p>
+      <div className="flex items-center justify-between border-b border-[#1c1c21] pb-5">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-white heading-display">Dashboard / overview</h1>
+          <p className="text-xs text-zinc-500 mt-1">
+            Manage your connected repository indices, code assets, and custom developer instructions.
+          </p>
+        </div>
+        <button 
+          onClick={() => navigate('/repositories')}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#17171c] hover:bg-[#202027] border border-[#2e2e36] rounded-md transition-all"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add Repository</span>
+        </button>
       </div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
-        {/* Stat 1: Repositories */}
-        <Card className="hover:border-zinc-700/60 transition duration-300">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b-0">
-            <CardTitle className="text-xs font-bold text-zinc-450 uppercase tracking-wider text-zinc-400">
-              Repositories
-            </CardTitle>
-            <GitBranch className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono">{repositories.length}</div>
-            <p className="text-[10px] text-zinc-500 mt-1">
-              {indexedRepos.length} indexed • {indexingRepos.length} active
-            </p>
-          </CardContent>
-        </Card>
+        {/* Stat 1: Active Workspace */}
+        <div className="minimal-card p-4 space-y-1.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Active Workspace</p>
+          <h3 className="text-sm font-bold text-zinc-200 truncate">{workspaceTitle}</h3>
+          <p className="text-[10px] text-zinc-500">{activeRepo ? `${activeRepo.language || 'Active'} codebase` : (user?.email || 'Local developer context')}</p>
+        </div>
 
-        {/* Stat 2: Documents */}
-        <Card className="hover:border-zinc-700/60 transition duration-300">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b-0">
-            <CardTitle className="text-xs font-bold text-zinc-450 uppercase tracking-wider text-zinc-400">
-              Corpus Docs
-            </CardTitle>
-            <FileText className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono">{documents.length}</div>
-            <p className="text-[10px] text-zinc-500 mt-1">
-              RAG Knowledge Bases active
-            </p>
-          </CardContent>
-        </Card>
+        {/* Stat 2: Repositories */}
+        <div className="minimal-card p-4 space-y-1.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Repositories</p>
+          <h3 className="text-sm font-bold text-zinc-250 font-mono text-zinc-200">
+            {repositories.length} <span className="text-[10px] font-sans font-medium text-zinc-500">indexed</span>
+          </h3>
+          <p className="text-[10px] text-zinc-500">
+            {indexingRepos.length} indexing active
+          </p>
+        </div>
 
-        {/* Stat 3: Memory Items */}
-        <Card className="hover:border-zinc-700/60 transition duration-300">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b-0">
-            <CardTitle className="text-xs font-bold text-zinc-455 uppercase tracking-wider text-zinc-400">
-              Dev Memory
-            </CardTitle>
-            <Brain className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono">{memories.length}</div>
-            <p className="text-[10px] text-zinc-500 mt-1">
-              {memories.filter(m => m.pinned).length} pinned developer rules
-            </p>
-          </CardContent>
-        </Card>
+        {/* Stat 3: Documents */}
+        <div className="minimal-card p-4 space-y-1.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Documents</p>
+          <h3 className="text-sm font-bold text-zinc-250 font-mono text-zinc-200">
+            {documents.length} <span className="text-[10px] font-sans font-medium text-zinc-500">files</span>
+          </h3>
+          <p className="text-[10px] text-zinc-500">RAG knowledge bases active</p>
+        </div>
 
-        {/* Stat 4: Active Chat sessions */}
-        <Card className="hover:border-zinc-700/60 transition duration-300">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 border-b-0">
-            <CardTitle className="text-xs font-bold text-zinc-455 uppercase tracking-wider text-zinc-400">
-              Active Chats
-            </CardTitle>
-            <MessageSquare className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold font-mono">{sessions.length}</div>
-            <p className="text-[10px] text-zinc-500 mt-1">
-              Conversations indexed in history
-            </p>
-          </CardContent>
-        </Card>
+        {/* Stat 4: Developer Rules */}
+        <div className="minimal-card p-4 space-y-1.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Developer Rules</p>
+          <h3 className="text-sm font-bold text-zinc-250 font-mono text-zinc-200">
+            {memories.length} <span className="text-[10px] font-sans font-medium text-zinc-500">active</span>
+          </h3>
+          <p className="text-[10px] text-zinc-500">Pinned guidelines in memory</p>
+        </div>
+
+        {/* Stat 5: Recent Syncs */}
+        <div className="minimal-card p-4 space-y-1.5">
+          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Recent Syncs</p>
+          <h3 className="text-sm font-bold text-zinc-250 font-mono text-zinc-200">
+            {indexedRepos.length} <span className="text-[10px] font-sans font-medium text-zinc-500">ready</span>
+          </h3>
+          <p className="text-[10px] text-zinc-500">Synced to vector database</p>
+        </div>
       </div>
 
-      {/* Main layout splitting: Quick Actions & Connected Core Systems */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Table: Indexed Repositories */}
+      <div className="minimal-card overflow-hidden">
         
-        {/* Left 2 Cols: Repository index health & Recent activity */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Active Workspaces Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Workspace Indexing status</CardTitle>
-              <CardDescription>Codebase semantic chunks ready for LLM retrieval</CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y divide-zinc-850">
-              {repositories.map((repo) => (
-                <div key={repo.id} className="py-3 flex items-center justify-between first:pt-0 last:pb-0">
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-bold text-zinc-200 font-mono">{repo.owner}/{repo.name}</h4>
-                    <div className="flex gap-3 text-[10px] text-zinc-500">
-                      <span>Lang: {repo.language}</span>
-                      <span>Size: {repo.size}</span>
-                      <span>Files: {repo.indexedFiles} / {repo.totalFiles}</span>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                    repo.status === 'indexed' 
-                      ? 'bg-green-950/40 border-green-800/50 text-green-400' 
-                      : repo.status === 'indexing' 
-                      ? 'bg-blue-950/40 border-blue-800/50 text-blue-400 animate-pulse'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-                  }`}>
-                    {repo.status === 'indexing' ? `Indexing ${repo.progress || 0}%` : repo.status}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        {/* Table Title Bar */}
+        <div className="px-5 py-4 border-b border-[#1c1c21] bg-[#0d0d10]">
+          <h2 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Indexed Repositories</h2>
+        </div>
 
-          {/* Quick Launchpad Guide */}
-          <div className="p-5 rounded-lg border border-blue-950/40 bg-blue-950/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h4 className="text-xs font-bold text-blue-300 uppercase tracking-wide flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5" />
-                Quickstart Prompting
-              </h4>
-              <p className="text-xs text-zinc-400 leading-normal max-w-lg">
-                Ask DevAssist AI to debug, write test suites, explain architectural frameworks, or search semantic chunks across all connected files instantly.
-              </p>
-            </div>
-            <Button size="sm" className="text-xs whitespace-nowrap" onClick={handleStartChat}>
-              <span>Start AI Chat</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-            </Button>
+        {/* Table Viewport */}
+        {repositories.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-[#1c1c21] bg-[#0a0a0c] text-zinc-450 text-zinc-400 font-semibold">
+                  <th className="px-5 py-3">Repository</th>
+                  <th className="px-5 py-3">Sync Status</th>
+                  <th className="px-5 py-3">Branches / Language</th>
+                  <th className="px-5 py-3">Total Files</th>
+                  <th className="px-5 py-3">Size / Chunks</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1c1c21] text-zinc-300">
+                {repositories.map((repo) => {
+                  let statusBadgeClass = "badge-syncing";
+                  let statusLabel = "indexing";
+                  
+                  if (repo.status === 'indexed') {
+                    statusBadgeClass = "badge-synced";
+                    statusLabel = "Synced";
+                  } else if (repo.status === 'failed') {
+                    statusBadgeClass = "badge-error";
+                    statusLabel = "Error";
+                  } else if (repo.status === 'indexing') {
+                    statusBadgeClass = "badge-syncing";
+                    statusLabel = `Syncing (${repo.progress || 0}%)`;
+                  }
+
+                  return (
+                    <tr 
+                      key={repo.id}
+                      onClick={() => navigate('/chat')}
+                      className="hover:bg-[#111115] cursor-pointer transition-colors"
+                    >
+                      {/* Name */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <GitBranch className="w-4 h-4 text-zinc-500" />
+                          <div>
+                            <span className="font-bold text-zinc-200">{repo.name}</span>
+                            <span className="text-[10px] text-zinc-500 block font-mono">{repo.owner || 'github'}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-5 py-4">
+                        <span className={statusBadgeClass}>{statusLabel}</span>
+                      </td>
+
+                      {/* Branches / Language */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 bg-[#17171c] border border-[#2e2e36] text-[10px] font-mono text-zinc-300 rounded">
+                            main
+                          </span>
+                          <span className="px-2 py-0.5 bg-[#0a0a0c] border border-[#1c1c21] text-[10px] font-mono text-zinc-400 rounded">
+                            {repo.language || 'generic'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Total Files */}
+                      <td className="px-5 py-4 font-mono text-zinc-400">
+                        {repo.indexedFiles || repo.totalFiles || 0}
+                      </td>
+
+                      {/* Size */}
+                      <td className="px-5 py-4 font-mono text-zinc-400">
+                        {repo.size || 'N/A'}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={(e) => handleReindex(e, repo.id)}
+                            disabled={repo.status === 'indexing'}
+                            className="p-1.5 text-zinc-500 hover:text-white bg-[#0a0a0c] border border-[#1c1c21] rounded hover:bg-[#17171c] transition"
+                            title="Reindex Repository"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(e, repo.id)}
+                            className="p-1.5 text-zinc-500 hover:text-red-400 bg-[#0a0a0c] border border-[#1c1c21] rounded hover:bg-[#17171c] transition"
+                            title="Delete Repository"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-
-        </div>
-
-        {/* Right 1 Col: Quick Links & Config Panel */}
-        <div className="space-y-6">
-          
-          {/* Active LLM Parameters */}
-          <Card>
-            <CardHeader className="pb-3 border-b-0">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-blue-500" />
-                Active LLM Profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0 text-xs">
-              <div className="space-y-2 p-3 bg-zinc-950/50 border border-zinc-850 rounded-lg">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500 font-semibold">LLM Provider:</span>
-                  <span className="text-zinc-200 font-mono capitalize">{settings.provider}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500 font-semibold">Active Model:</span>
-                  <span className="text-zinc-200 font-mono">{settings.model}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500 font-semibold">Temperature:</span>
-                  <span className="text-zinc-200 font-mono">{settings.temperature}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500 font-semibold">Embedder:</span>
-                  <span className="text-zinc-200 font-mono text-[10.5px] truncate max-w-[120px]" title={settings.embeddingModel}>
-                    {settings.embeddingModel.split(' ')[0]}
-                  </span>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full text-xs font-semibold"
-                onClick={() => navigate('/settings')}
-              >
-                <SettingsIcon className="w-3.5 h-3.5 mr-1.5" />
-                <span>Configure Settings</span>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Navigation Shortcuts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2.5 pt-0">
-              <button 
-                onClick={() => navigate('/search')}
-                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-850 bg-zinc-900/10 hover:bg-zinc-850/40 text-left transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-zinc-400" />
-                  <span className="text-xs font-bold text-zinc-200">Global Code Search</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-500" />
-              </button>
-              <button 
-                onClick={() => navigate('/repositories')}
-                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-850 bg-zinc-900/10 hover:bg-zinc-850/40 text-left transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-zinc-400" />
-                  <span className="text-xs font-bold text-zinc-200">Index Repository</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-500" />
-              </button>
-              <button 
-                onClick={() => navigate('/memory')}
-                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-zinc-850 bg-zinc-900/10 hover:bg-zinc-850/40 text-left transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-zinc-400" />
-                  <span className="text-xs font-bold text-zinc-200">Manage LLM Rules</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-500" />
-              </button>
-            </CardContent>
-          </Card>
-
-        </div>
+        ) : (
+          <div className="p-8 text-center bg-[#0d0d10] text-zinc-500 italic">
+            No repositories registered yet. Add a repository to get started.
+          </div>
+        )}
       </div>
+
     </div>
   );
 };

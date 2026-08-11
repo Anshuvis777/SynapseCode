@@ -9,19 +9,21 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
-
 # ── Data transfer objects ───────────────────────────────────────
+
 
 @dataclass
 class LLMMessage:
     """A single message in a chat conversation."""
-    role: str   # "system" | "user" | "assistant"
+
+    role: str  # "system" | "user" | "assistant"
     content: str
 
 
 @dataclass
 class LLMResponse:
     """Completed (non-streaming) LLM response."""
+
     content: str
     model: str
     input_tokens: int
@@ -31,14 +33,16 @@ class LLMResponse:
 @dataclass
 class StreamChunk:
     """A single streamed token chunk."""
-    delta: str          # the new text fragment
-    is_done: bool       # True on the final chunk
+
+    delta: str  # the new text fragment
+    is_done: bool  # True on the final chunk
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
 
 
 # ── Abstract interfaces ─────────────────────────────────────────
+
 
 class LLMProvider(ABC):
     """

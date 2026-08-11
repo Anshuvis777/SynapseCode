@@ -11,21 +11,29 @@ Endpoints:
 
 import json
 import uuid
-from typing import AsyncGenerator
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections.abc import AsyncGenerator
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
-from app.models.user import User
-from app.models.session import Session
 from app.models.message import Message
-from app.schemas.chat import SessionCreate, SessionResponse, MessageCreate, MessageResponse
-from app.storage.database import get_db, AsyncSessionLocal
-from app.services.retrieval import RetrievalService
-from app.providers.factory import get_llm_provider
+from app.models.session import Session
+from app.models.user import User
 from app.providers.base import LLMMessage
+from app.providers.factory import get_embedding_provider, get_llm_provider
+from app.schemas.chat import (
+    MessageCreate,
+    MessageResponse,
+    SessionCreate,
+    SessionResponse,
+    SessionUpdate,
+)
+from app.services.retrieval import RetrievalService
+from app.storage.database import AsyncSessionLocal, get_db
+from app.storage.vector_store import vector_store
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -77,7 +85,7 @@ async def list_sessions(
     if repository_id:
         query = query.where(Session.repo_id == repository_id)
     query = query.order_by(Session.updated_at.desc())
-    
+
     result = await db.execute(query)
     return list(result.scalars().all())
 
@@ -102,7 +110,9 @@ async def get_session(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    messages_query = select(Message).where(Message.session_id == session_id).order_by(Message.created_at.asc())
+    messages_query = (
+        select(Message).where(Message.session_id == session_id).order_by(Message.created_at.asc())
+    )
     messages_result = await db.execute(messages_query)
     messages = messages_result.scalars().all()
 
@@ -141,6 +151,36 @@ async def delete_session(
     return None
 
 
+@router.patch(
+    "/sessions/{session_id}",
+    response_model=SessionResponse,
+    summary="Update chat session attached repository or title",
+)
+async def update_session(
+    session_id: uuid.UUID,
+    payload: SessionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Session:
+    query = select(Session).where(
+        Session.id == session_id,
+        Session.user_id == current_user.id,
+    )
+    session = await db.scalar(query)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if payload.repository_id is not None or "repository_id" in payload.model_fields_set:
+        session.repo_id = payload.repository_id
+    if payload.title is not None:
+        session.title = payload.title
+
+    await db.commit()
+    await db.refresh(session)
+    logger.info("chat_session_updated", session_id=str(session_id), repo_id=str(session.repo_id))
+    return session
+
+
 @router.post(
     "/sessions/{session_id}/messages",
     summary="Send a message and stream the assistant response via SSE",
@@ -148,13 +188,15 @@ async def delete_session(
 async def send_message(
     session_id: uuid.UUID,
     payload: MessageCreate,
+    x_llm_provider: str | None = Header(None, alias="X-LLM-Provider"),
+    x_llm_api_key: str | None = Header(None, alias="X-LLM-API-Key"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """
-    Submit a user query. 
+    Submit a user query.
     Retrieves matching repository code, references historical context, and streams the answer.
-    
+
     Response format: Server-Sent Events (SSE).
     """
     # 1. Verify session ownership
@@ -166,6 +208,13 @@ async def send_message(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
+    # Verify custom LLM API key presence
+    if not x_llm_api_key or not x_llm_api_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="LLM API key is required. Please set your API key in your profile settings.",
+        )
+
     # 2. Save user message to PostgreSQL
     user_msg = Message(
         id=uuid.uuid4(),
@@ -176,7 +225,7 @@ async def send_message(
     db.add(user_msg)
     await db.flush()
 
-    # 3. Retrieve relevant repository code context
+    # 3. Retrieve relevant repository code context ONLY if session has an attached repository
     chunks = []
     if session.repo_id is not None:
         chunks = await retrieval_service.retrieve_context(
@@ -184,9 +233,24 @@ async def send_message(
             repository_id=session.repo_id,
             query=payload.content,
         )
-    context_str = retrieval_service.format_context_prompt(chunks)
+    context_str = retrieval_service.format_context_prompt(chunks) if chunks else ""
 
-    # 4. Fetch last 6 messages for context memory
+    # 4. Fetch long-term developer memories from Qdrant
+    memories_str = ""
+    try:
+        embedder = get_embedding_provider()
+        query_vector = await embedder.embed_text(payload.content)
+        memories = await vector_store.search_memories(
+            user_id=current_user.id,
+            query_vector=query_vector,
+            limit=5,
+        )
+        if memories:
+            memories_str = "\n".join([f"- {m['content']}" for m in memories if m.get("content")])
+    except Exception as e:
+        logger.error("failed_to_retrieve_memories", error=str(e))
+
+    # 5. Fetch last 6 messages for context history
     history_query = (
         select(Message)
         .where(Message.session_id == session_id)
@@ -198,15 +262,30 @@ async def send_message(
 
     # Construct conversation payload for LLM
     llm_messages = []
-    
-    # Inject system instruction with RAG context
-    system_instruction = (
-        "You are DevAssist AI, a staff software developer assistant.\n"
-        "Your task is to answer user questions about their software repository using the provided code snippets.\n"
-        "Be concise, technical, precise, and cite the file names you are referring to.\n\n"
-        "Here are the relevant code snippets for context:\n"
-        f"{context_str}"
-    )
+
+    # Inject system instruction with RAG context and developer memories
+    if session.repo_id is not None and context_str:
+        system_instruction = (
+            "You are CodexRAG, a staff software developer assistant.\n"
+            "Your task is to answer user questions about the attached repository/document "
+            "using ONLY the provided code and document context snippets.\n"
+            "Do NOT reference or assume any other repositories, projects, or external files not in the context.\n"
+            "Be concise, technical, precise, and cite the file names you are referring to.\n\n"
+        )
+    else:
+        system_instruction = (
+            "You are CodexRAG, an intelligent AI developer assistant.\n"
+            "No repository or document is attached to this conversation.\n"
+            "Answer the user's questions in a clear, general, and helpful manner.\n"
+            "Do NOT assume or mention any specific repository or project files unless the user mentions them.\n\n"
+        )
+    if memories_str:
+        system_instruction += (
+            "Here are the user's custom instructions/preferences from their developer memory:\n"
+            f"{memories_str}\n\n"
+        )
+    if context_str:
+        system_instruction += f"Here are the relevant code snippets for context:\n{context_str}"
     llm_messages.append(LLMMessage(role="system", content=system_instruction))
 
     # Add conversation history
@@ -220,14 +299,18 @@ async def send_message(
 
     # 5. Define streaming generator
     async def sse_generator() -> AsyncGenerator[str, None]:
-        llm = get_llm_provider()
+        llm = get_llm_provider(provider=x_llm_provider, api_key=x_llm_api_key)
         full_response = []
         assistant_msg_id = uuid.uuid4()
 
         try:
             # Yield code context metadata to frontend first so user knows what files were used
             sources = [
-                {"file_path": c["file_path"], "start_line": c["start_line"], "end_line": c["end_line"]}
+                {
+                    "file_path": c["file_path"],
+                    "start_line": c["start_line"],
+                    "end_line": c["end_line"],
+                }
                 for c in chunks
             ]
             yield f"data: {json.dumps({'sources': sources})}\n\n"
@@ -244,21 +327,29 @@ async def send_message(
             if assistant_content.strip():
                 # Write to DB using a dedicated session since get_db might close before generator finishes
                 async with AsyncSessionLocal() as write_db:
+                    # Estimate token counts (approx 4 chars per token)
+                    prompt_len = sum(len(m.content or "") for m in llm_messages)
+                    input_tokens = prompt_len // 4
+                    output_tokens = len(assistant_content) // 4
+
                     assistant_msg = Message(
                         id=assistant_msg_id,
                         session_id=session_id,
                         role="assistant",
                         content=assistant_content,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        sources=sources,
                     )
                     write_db.add(assistant_msg)
                     # Touch/update session updated_at time
                     session_to_update = await write_db.get(Session, session_id)
                     if session_to_update:
-                        session_to_update.title = session_to_update.title # force trigger change
+                        session_to_update.title = session_to_update.title  # force trigger change
                     await write_db.commit()
 
             # Final SSE completion packet
-            yield f"data: {json.dumps({'done': True, 'message_id': str(assistant_msg_id)})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'message_id': str(assistant_msg_id), 'tokens_used': {'prompt': input_tokens, 'completion': output_tokens, 'total': input_tokens + output_tokens}})}\n\n"
 
         except Exception as e:
             logger.error("sse_streaming_failed", error=str(e))

@@ -5,12 +5,12 @@ DevAssist AI — Chat Message ORM Model
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.mixins import TimestampMixin, UUIDMixin
 from app.storage.database import Base
-from app.models.mixins import UUIDMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.session import Session

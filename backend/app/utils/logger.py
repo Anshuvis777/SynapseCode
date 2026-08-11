@@ -23,11 +23,9 @@ def setup_logging(log_level: str = "INFO") -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer()  # Pretty output for dev
+            structlog.dev.ConsoleRenderer(),  # Pretty output for dev
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            logging.getLevelName(log_level)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(log_level)),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,

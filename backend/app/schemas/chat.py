@@ -4,17 +4,29 @@ DevAssist AI — Chat API Pydantic Schemas
 
 import uuid
 from datetime import datetime
+
 from pydantic import BaseModel, Field, model_validator
 
 
 class SessionCreate(BaseModel):
     """Payload to create a new chat session."""
-    repository_id: uuid.UUID = Field(..., description="ID of the repository this session is scoped to")
+
+    repository_id: uuid.UUID | None = Field(
+        default=None, description="ID of the repository this session is scoped to"
+    )
     title: str = Field(default="New Conversation", max_length=255)
+
+
+class SessionUpdate(BaseModel):
+    """Payload to update an existing chat session."""
+
+    repository_id: uuid.UUID | None = None
+    title: str | None = None
 
 
 class SessionResponse(BaseModel):
     """Database representation of a chat session."""
+
     id: uuid.UUID
     user_id: uuid.UUID
     repository_id: uuid.UUID | None = None
@@ -37,14 +49,16 @@ class SessionResponse(BaseModel):
 
 class MessageCreate(BaseModel):
     """Payload to send a new message in a session."""
+
     content: str = Field(..., min_length=1, description="Message text from the developer")
 
 
 class MessageResponse(BaseModel):
     """Database representation of a chat message."""
+
     id: uuid.UUID
     session_id: uuid.UUID
-    role: str # "user" | "assistant" | "system"
+    role: str  # "user" | "assistant" | "system"
     content: str
     created_at: datetime
 

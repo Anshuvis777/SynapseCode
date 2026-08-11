@@ -51,13 +51,10 @@ async def test_create_memory_flow(
     # Mock Qdrant upsert
     mock_vector_store.upsert_memories = AsyncMock()
 
-    payload = {
-        "content": "I prefer using async/await syntax in JavaScript",
-        "category": "style"
-    }
+    payload = {"content": "I prefer using async/await syntax in JavaScript", "category": "style"}
 
     response = await client.post("/api/memories", json=payload)
-    
+
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data["content"] == payload["content"]
@@ -78,16 +75,14 @@ async def test_list_memories(
     override_auth,
 ):
     mock_id = uuid.uuid4()
-    mock_vector_store.list_memories = AsyncMock(return_value=[
-        {
-            "id": mock_id,
-            "content": "Prefers typescript over javascript",
-            "category": "style"
-        }
-    ])
+    mock_vector_store.list_memories = AsyncMock(
+        return_value=[
+            {"id": mock_id, "content": "Prefers typescript over javascript", "category": "style"}
+        ]
+    )
 
     response = await client.get("/api/memories")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert len(data) == 1
@@ -108,6 +103,6 @@ async def test_delete_memory(
     mock_vector_store.delete_memory = AsyncMock()
 
     response = await client.delete(f"/api/memories/{mock_id}")
-    
+
     assert response.status_code == status.HTTP_204_NO_CONTENT
     mock_vector_store.delete_memory.assert_called_once_with(mock_user.id, mock_id)

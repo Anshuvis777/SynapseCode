@@ -143,27 +143,55 @@ const CodeBlock: React.FC<{ content: string; language: string }> = ({ content, l
 
   const isMermaid = language === 'mermaid';
 
-  // Simple syntax highlighter for UI presentation
   const highlightCode = (code: string, lang: string) => {
     if (lang === 'text') return code;
     
-    // Fallback simple highlighter using regexes for visual flavor
-    const keywords = /\b(const|let|var|function|return|export|import|from|class|extends|async|await|def|import|from|as|if|elif|else|for|while|try|except|with|yield|interface|type|public|private)\b/g;
-    const strings = /("[^"]*"|'[^']*'|`[^`]*`)/g;
-    const comments = /(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
-    const numbers = /\b(\d+)\b/g;
-    const types = /\b(string|number|boolean|any|void|unknown|List|Dict|Tuple|str|int|float|bool|Depends|APIRouter|FastAPI)\b/g;
-
     let highlighted = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
-    highlighted = highlighted.replace(comments, '<span class="text-zinc-500 font-normal">$1</span>');
-    highlighted = highlighted.replace(strings, '<span class="text-emerald-400">$1</span>');
-    highlighted = highlighted.replace(keywords, '<span class="text-blue-400 font-semibold">$1</span>');
-    highlighted = highlighted.replace(types, '<span class="text-sky-300 font-medium">$1</span>');
-    highlighted = highlighted.replace(numbers, '<span class="text-amber-400">$1</span>');
+    const placeholders: string[] = [];
+    const addPlaceholder = (html: string) => {
+      const id = `___PLACEHOLDER_${placeholders.length}___`;
+      placeholders.push(html);
+      return id;
+    };
+
+    // 1. Extract comments first so they aren't parsed by anything else
+    const comments = /(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
+    highlighted = highlighted.replace(comments, (match) => 
+      addPlaceholder(`<span class="text-zinc-500 font-normal">${match}</span>`)
+    );
+
+    // 2. Extract strings next
+    const strings = /("[^"]*"|'[^']*'|`[^`]*`)/g;
+    highlighted = highlighted.replace(strings, (match) => 
+      addPlaceholder(`<span class="text-emerald-400">${match}</span>`)
+    );
+
+    // 3. Extract keywords
+    const keywords = /\b(const|let|var|function|return|export|import|from|class|extends|async|await|def|if|elif|else|for|while|try|except|with|yield|interface|type|public|private)\b/g;
+    highlighted = highlighted.replace(keywords, (match) =>
+      addPlaceholder(`<span class="text-blue-400 font-semibold">${match}</span>`)
+    );
+
+    // 4. Extract types
+    const types = /\b(string|number|boolean|any|void|unknown|List|Dict|Tuple|str|int|float|bool|Depends|APIRouter|FastAPI)\b/g;
+    highlighted = highlighted.replace(types, (match) =>
+      addPlaceholder(`<span class="text-sky-300 font-medium">${match}</span>`)
+    );
+
+    // 5. Extract numbers
+    const numbers = /\b(\d+)\b/g;
+    highlighted = highlighted.replace(numbers, (match) =>
+      addPlaceholder(`<span class="text-amber-400">${match}</span>`)
+    );
+
+    // 6. Restore placeholders
+    for (let i = placeholders.length - 1; i >= 0; i--) {
+      highlighted = highlighted.replace(`___PLACEHOLDER_${i}___`, placeholders[i]);
+    }
 
     return <code dangerouslySetInnerHTML={{ __html: highlighted }} />;
   };
@@ -175,7 +203,7 @@ const CodeBlock: React.FC<{ content: string; language: string }> = ({ content, l
         <div className="flex justify-between items-center px-4 py-2 border-b border-zinc-800 bg-zinc-900/50">
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-400">
             <BarChart2 className="w-4 h-4" />
-            <span>DevAssist Agent Flowchart</span>
+            <span>CodexRAG Agent Flowchart</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -222,7 +250,7 @@ const CodeBlock: React.FC<{ content: string; language: string }> = ({ content, l
               </div>
             </div>
             <div className="mt-4 text-[11px] text-zinc-500 italic">
-              Interactive visualization compiled by DevAssist LLM
+              Interactive visualization compiled by CodexRAG LLM
             </div>
           </div>
         )}

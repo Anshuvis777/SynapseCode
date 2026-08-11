@@ -2,20 +2,19 @@
 Unit tests for security utilities — password hashing and JWT.
 """
 
-import pytest
 import jwt
+import pytest
 
 from app.utils.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
+    verify_password,
 )
-from app.config import settings
-
 
 # ── Password tests ──────────────────────────────────────────────
+
 
 def test_hash_password_produces_bcrypt_hash():
     hashed = hash_password("secret123")
@@ -34,6 +33,7 @@ def test_verify_password_wrong():
 
 
 # ── JWT tests ───────────────────────────────────────────────────
+
 
 def test_access_token_contains_correct_claims():
     token = create_access_token("user-123", "user@test.com")

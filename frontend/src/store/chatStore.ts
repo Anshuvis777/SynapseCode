@@ -14,8 +14,9 @@ interface ChatState {
   fetchMemories: () => Promise<void>;
   
   // Chat Actions
-  createSession: (repositoryId: string, title?: string) => Promise<string>;
+  createSession: (repositoryId?: string, title?: string) => Promise<string>;
   selectSession: (id: string | null) => Promise<void>;
+  updateSessionRepository: (sessionId: string, repositoryId: string | null) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   sendMessage: (content: string, repositoryId?: string) => Promise<void>;
   
@@ -113,21 +114,53 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await apiClient.get(`/chat/sessions/${id}`);
       const sessionData = response.data;
       
-      const messages: Message[] = sessionData.messages.map((m: any) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'done',
-      }));
+      const messages: Message[] = sessionData.messages.map((m: any) => {
+        const total = (m.input_tokens || 0) + (m.output_tokens || 0);
+        return {
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'done',
+          tokensUsed: total > 0 ? {
+            prompt: m.input_tokens || 0,
+            completion: m.output_tokens || 0,
+            total,
+          } : undefined,
+          retrievedFiles: m.sources ? m.sources.map((src: any) => ({
+            path: src.file_path,
+            confidence: 0.95,
+            lines: `${src.start_line}-${src.end_line}`,
+          })) : [],
+          agentSteps: total > 0 ? [
+            { id: 'step-1', title: 'Searching repository codebase...', status: 'completed', durationMs: 400 },
+            { id: 'step-2', title: 'Formulating solution...', status: 'completed', durationMs: 1200 }
+          ] : undefined,
+        };
+      });
 
       set((state) => ({
         sessions: state.sessions.map((s) =>
-          s.id === id ? { ...s, messages } : s
+          s.id === id ? { ...s, repositoryId: sessionData.repository_id || undefined, messages } : s
         ),
       }));
     } catch (e) {
-      console.error(`Failed to fetch messages for session ${id}`, e);
+      console.error('Failed to fetch session detail', e);
+    }
+  },
+
+  updateSessionRepository: async (sessionId: string, repositoryId: string | null) => {
+    try {
+      await apiClient.patch(`/chat/sessions/${sessionId}`, {
+        repository_id: repositoryId,
+      });
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === sessionId ? { ...s, repositoryId: repositoryId || undefined } : s
+        ),
+      }));
+    } catch (e) {
+      console.error('Failed to update session repository context', e);
     }
   },
 
@@ -212,20 +245,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const storedUser = localStorage.getItem('devassist_user');
       let token = '';
+      let provider = '';
+      let apiKey = '';
       if (storedUser) {
         try {
           const parsed = JSON.parse(storedUser);
           token = parsed.token || '';
+          provider = parsed.llmProvider || '';
+          apiKey = parsed.llmProvider === 'openai' ? parsed.openaiApiKey : parsed.groqApiKey;
         } catch {}
       }
 
       const baseURL = apiClient.defaults.baseURL || 'http://localhost:8000/api';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+      if (provider) {
+        headers['X-LLM-Provider'] = provider;
+      }
+      if (apiKey) {
+        headers['X-LLM-API-Key'] = apiKey;
+      }
+
       const response = await fetch(`${baseURL}/chat/sessions/${sessionId}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ content }),
       });
 
@@ -325,6 +370,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                                 ...m,
                                 id: data.message_id,
                                 status: 'done',
+                                tokensUsed: data.tokens_used ? {
+                                  prompt: data.tokens_used.prompt,
+                                  completion: data.tokens_used.completion,
+                                  total: data.tokens_used.total,
+                                } : undefined,
                                 agentSteps: [
                                   { id: 'step-1', title: 'Searching repository codebase...', status: 'completed', durationMs: 400 },
                                   { id: 'step-2', title: 'Formulating solution...', status: 'completed', durationMs: 1200 }

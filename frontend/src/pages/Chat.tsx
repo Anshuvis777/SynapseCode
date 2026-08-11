@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Plus, Trash2, Send, Bot, User as UserIcon, Database, Sparkles } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, Send, Bot, User as UserIcon, Database, Sparkles, ShieldCheck } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { useRepositoryStore } from '../store/repositoryStore';
 import { useUserStore } from '../store/userStore';
@@ -15,6 +15,7 @@ export const Chat: React.FC = () => {
     isStreaming, 
     createSession, 
     selectSession, 
+    updateSessionRepository,
     deleteSession, 
     sendMessage 
   } = useChatStore();
@@ -29,7 +30,6 @@ export const Chat: React.FC = () => {
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null;
   const messages = activeSession?.messages || [];
 
-  // Scroll to bottom on new messages or streaming
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -38,38 +38,52 @@ export const Chat: React.FC = () => {
     scrollToBottom();
   }, [messages.length, isStreaming]);
 
-  // Initial scroll
   useEffect(() => {
+    if (activeSession) {
+      setActiveRepository(activeSession.repositoryId || null);
+    }
     if (activeSessionId) {
       setTimeout(scrollToBottom, 50);
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, activeSession?.repositoryId]);
+
+  const activeProvider = user?.llmProvider || 'groq';
+  const activeKey = activeProvider === 'openai' ? user?.openaiApiKey : user?.groqApiKey;
+  const hasApiKey = !!activeKey;
+
+  const handleContextChange = async (repoId: string | null) => {
+    setActiveRepository(repoId);
+    if (activeSessionId) {
+      await updateSessionRepository(activeSessionId, repoId);
+    }
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isStreaming || !activeSessionId) return;
+    if (!hasApiKey || !input.trim() || isStreaming || !activeSessionId) return;
 
     const messageText = input;
     setInput('');
-    await sendMessage(messageText, activeRepositoryId || undefined);
+    const targetRepoId = activeSession?.repositoryId || activeRepositoryId || undefined;
+    await sendMessage(messageText, targetRepoId);
   };
 
   const handleNewSession = async () => {
-    const newId = await createSession(activeRepositoryId || '');
+    const newId = await createSession(activeRepositoryId || undefined);
     selectSession(newId);
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden bg-[#060608]">
       
       {/* 1. CHAT HISTORY LEFT SIDEBAR */}
-      <div className="w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col h-full flex-shrink-0">
+      <aside className="w-64 border-r border-[#1c1c21] bg-[#0a0a0c] flex flex-col h-full flex-shrink-0">
         
         {/* New Session Button */}
-        <div className="p-3 border-b border-zinc-900 bg-zinc-950">
+        <div className="p-3 border-b border-[#1c1c21]">
           <Button 
             onClick={handleNewSession}
-            className="w-full text-xs font-bold justify-center"
+            className="w-full text-xs font-semibold justify-center bg-[#17171c] hover:bg-[#202027] border border-[#2e2e36] text-white"
             size="sm"
           >
             <Plus className="w-4 h-4 mr-1.5" />
@@ -91,12 +105,12 @@ export const Chat: React.FC = () => {
                   className={cn(
                     "group relative flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all",
                     isActive 
-                      ? "bg-zinc-900 border border-zinc-800 text-zinc-100" 
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                      ? "bg-[#17171c] border border-[#2e2e36] text-zinc-100" 
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#111115]"
                   )}
                 >
                   <div className="flex items-start gap-2.5 overflow-hidden pr-6">
-                    <MessageSquare className={cn("w-4 h-4 mt-0.5 flex-shrink-0", isActive ? "text-blue-400" : "text-zinc-500")} />
+                    <MessageSquare className={cn("w-4 h-4 mt-0.5 flex-shrink-0", isActive ? "text-blue-500" : "text-zinc-500")} />
                     <div className="overflow-hidden">
                       <h4 className="text-xs font-semibold truncate leading-tight">{session.title}</h4>
                       <p className="text-[9px] text-zinc-500 mt-0.5 truncate">
@@ -119,15 +133,15 @@ export const Chat: React.FC = () => {
               );
             })
           ) : (
-            <div className="py-8 text-center text-zinc-650 text-[11px] italic">
+            <div className="py-8 text-center text-zinc-600 text-[11px] italic">
               No chat history.
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
       {/* 2. CHAT VIEWPORT */}
-      <div className="flex-grow flex flex-col h-full bg-zinc-900/20 relative">
+      <div className="flex-grow flex flex-col h-full bg-[#060608] relative">
         
         {/* Active Session Content */}
         {activeSession ? (
@@ -139,13 +153,13 @@ export const Chat: React.FC = () => {
             >
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
-                  <div className="max-w-md text-center p-8 space-y-3.5">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 border border-zinc-800 mx-auto text-blue-400 shadow-md">
+                  <div className="max-w-md text-center p-8 space-y-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0d0d10] border border-[#1c1c21] mx-auto text-blue-500 shadow-sm">
                       <Sparkles className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-100">Welcome to DevAssist Chat</h3>
-                      <p className="text-xs text-zinc-450 text-zinc-400 mt-1 max-w-[280px] mx-auto leading-normal">
+                      <h3 className="text-sm font-bold text-zinc-100">Welcome to CodexRAG Chat</h3>
+                      <p className="text-xs text-zinc-400 mt-1 max-w-[280px] mx-auto leading-normal">
                         Select a repository or type a question about code architecture, documentation, or algorithm design.
                       </p>
                     </div>
@@ -159,7 +173,7 @@ export const Chat: React.FC = () => {
                         <button
                           key={i}
                           onClick={() => setInput(prompt)}
-                          className="p-2.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border border-zinc-850 hover:border-zinc-800 rounded-lg text-left transition"
+                          className="p-2.5 text-xs text-zinc-450 hover:text-zinc-200 bg-[#0d0d10] border border-[#1c1c21] hover:border-[#2e2e36] rounded-lg text-left transition"
                         >
                           {prompt}
                         </button>
@@ -176,10 +190,10 @@ export const Chat: React.FC = () => {
                       <div 
                         key={message.id} 
                         className={cn(
-                          "flex gap-4 p-4 rounded-xl border transition-colors",
+                          "flex gap-4 p-4 rounded-xl border transition-colors max-w-[90%]",
                           isUser 
-                            ? "bg-zinc-950/20 border-zinc-900/50" 
-                            : "bg-zinc-900/40 border-zinc-800/80 shadow-sm"
+                            ? "bg-[#18181b] border-[#27272a] ml-auto" 
+                            : "bg-[#0d0d10] border-[#1c1c21] mr-auto"
                         )}
                       >
                         {/* Avatar */}
@@ -189,7 +203,7 @@ export const Chat: React.FC = () => {
                               <UserIcon className="h-4.5 w-4.5" />
                             </div>
                           ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-950 border border-blue-900 text-blue-400">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-950/40 border border-blue-900/50 text-blue-500">
                               <Bot className="h-4.5 w-4.5" />
                             </div>
                           )}
@@ -199,7 +213,7 @@ export const Chat: React.FC = () => {
                         <div className="flex-grow overflow-hidden space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-zinc-300">
-                              {isUser ? user?.name || 'Developer' : 'DevAssist Agent'}
+                              {isUser ? user?.name || 'Developer' : 'CodexRAG Agent'}
                             </span>
                             <span className="text-[10px] text-zinc-500">
                               {message.timestamp}
@@ -234,20 +248,20 @@ export const Chat: React.FC = () => {
             </div>
 
             {/* Bottom Form input */}
-            <div className="p-4 border-t border-zinc-900 bg-zinc-950/80 backdrop-blur-md">
+            <div className="p-4 border-t border-[#1c1c21] bg-[#060608] pb-6">
               <form onSubmit={handleSend} className="max-w-3xl mx-auto space-y-2.5">
                 
                 {/* Context Selector controls */}
-                <div className="flex flex-wrap items-center gap-3 text-xs bg-zinc-900/50 p-2 border border-zinc-850 rounded-lg">
+                <div className="flex flex-wrap items-center gap-3 text-xs bg-[#0d0d10] p-2 border border-[#1c1c21] rounded-lg">
                   <div className="flex items-center gap-1.5 text-zinc-400 font-semibold">
-                    <Database className="w-3.5 h-3.5 text-blue-400" />
+                    <Database className="w-3.5 h-3.5 text-blue-500" />
                     <span>Workspace Context:</span>
                   </div>
 
                   <select
-                    value={activeRepositoryId || ''}
-                    onChange={(e) => setActiveRepository(e.target.value || null)}
-                    className="bg-zinc-950 border border-zinc-800 text-[11px] rounded px-2.5 py-1 text-zinc-300 focus:outline-none focus:border-blue-500"
+                    value={activeSession?.repositoryId || ''}
+                    onChange={(e) => handleContextChange(e.target.value || null)}
+                    className="bg-[#060608] border border-[#1c1c21] text-[11px] rounded px-2.5 py-1 text-zinc-300 focus:outline-none focus:border-blue-500"
                   >
                     <option value="">No Active Repository</option>
                     {repositories.map((repo) => (
@@ -258,8 +272,22 @@ export const Chat: React.FC = () => {
                   </select>
                 </div>
 
+                {/* API Key Missing Alert */}
+                {!hasApiKey && (
+                  <div className="mb-3 p-3 bg-amber-950/20 border border-amber-900/30 text-amber-200 rounded-lg text-xs leading-normal flex items-start gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-amber-300">LLM API Key Required (Zero-Retention Privacy): </span>
+                      For your privacy and security, API keys are <strong>never stored on the server</strong>. Please click your profile card in the bottom-left sidebar to provide your <strong>{activeProvider === 'openai' ? 'OpenAI' : 'Groq'} API Key</strong> for this session.
+                    </div>
+                  </div>
+                )}
+
                 {/* Input Text Box */}
-                <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden focus-within:border-blue-500/80 transition-colors">
+                <div className={cn(
+                  "relative flex items-center bg-[#0d0d10] border border-[#1c1c21] rounded-lg overflow-hidden focus-within:border-zinc-700 transition-colors",
+                  !hasApiKey && "opacity-50 cursor-not-allowed bg-zinc-950/20"
+                )}>
                   <textarea
                     rows={1}
                     value={input}
@@ -270,19 +298,19 @@ export const Chat: React.FC = () => {
                         handleSend(e);
                       }
                     }}
-                    placeholder="Ask DevAssist a question about your code or index..."
-                    className="flex-grow px-4 py-3 text-sm bg-transparent border-0 text-zinc-200 placeholder-zinc-550 focus:outline-none resize-none max-h-24 min-h-[44px]"
-                    disabled={isStreaming}
+                    placeholder={hasApiKey ? "Ask CodexRAG a question about your code or index..." : "Please configure your LLM API key in profile settings to chat..."}
+                    className="flex-grow px-4 py-3 text-sm bg-transparent border-0 text-zinc-200 placeholder-zinc-500 focus:outline-none resize-none max-h-24 min-h-[44px]"
+                    disabled={isStreaming || !hasApiKey}
                   />
 
                   <div className="flex items-center gap-2 pr-3">
                     <Button
                       type="submit"
-                      disabled={!input.trim() || isStreaming}
+                      disabled={!input.trim() || isStreaming || !hasApiKey}
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 bg-[#17171c] hover:bg-[#202027] border border-[#2e2e36]"
                     >
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4 text-zinc-200" />
                     </Button>
                   </div>
                 </div>
@@ -297,7 +325,7 @@ export const Chat: React.FC = () => {
               title="No Chat Session Selected"
               description="Create a new workspace assistant chat session or select an existing conversation from the sidebar."
               action={
-                <Button onClick={handleNewSession}>
+                <Button onClick={handleNewSession} className="bg-[#17171c] hover:bg-[#202027] border border-[#2e2e36] text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   <span>Start New Session</span>
                 </Button>

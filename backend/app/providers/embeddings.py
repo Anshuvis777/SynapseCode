@@ -17,8 +17,8 @@ Model: nomic-embed-text
 import asyncio
 from typing import cast
 
-from fastembed import TextEmbedding
 import httpx
+from fastembed import TextEmbedding
 
 from app.config import settings
 from app.providers.base import EmbeddingProvider
@@ -134,10 +134,11 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
     """
 
     def __init__(self) -> None:
-        self._model_name = "nomic-ai/nomic-embed-text-v1.5"
+        self._model_name = "BAAI/bge-small-en-v1.5"
         self._dims = settings.embedding_dimensions
         # TextEmbedding is loaded synchronously inside the constructor
-        self._model = TextEmbedding(model_name=self._model_name)
+        # Limit threads to 1 to prevent memory exhaustion / OOM killer on low-resource machines
+        self._model = TextEmbedding(model_name=self._model_name, threads=1)
 
     @property
     def dimensions(self) -> int:
@@ -159,8 +160,8 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
         return embeddings
 
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
-        # FastEmbed.embed returns a generator of numpy arrays
-        generator = self._model.embed(texts)
+        # FastEmbed.embed returns a generator of numpy arrays with batch processing
+        generator = self._model.embed(texts, batch_size=32)
         return [list(vector) for vector in generator]
 
     async def health_check(self) -> bool:

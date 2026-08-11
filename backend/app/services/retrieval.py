@@ -30,14 +30,19 @@ class RetrievalService:
     async def retrieve_context(
         self,
         user_id: uuid.UUID,
-        repository_id: uuid.UUID,
+        repository_id: uuid.UUID | None,
         query: str,
         limit: int = 6,
     ) -> list[dict[str, Any]]:
         """
         Embed the user query, execute semantic search in Qdrant,
         apply basic code-focused re-scoring, and return list of chunks.
+        Strictly returns an empty list if no repository is attached.
         """
+        if not repository_id:
+            logger.info("no_repository_attached_skipping_retrieval")
+            return []
+
         logger.info("retrieving_context", repo_id=str(repository_id), query=query)
 
         # 1. Embed query
@@ -48,12 +53,31 @@ class RetrievalService:
             user_id=user_id,
             repository_id=repository_id,
             query_vector=query_vector,
-            limit=limit * 2, # Fetch more for re-ranking/filtering
+            limit=limit * 2,  # Fetch more for re-ranking/filtering
         )
 
         # 3. Simple lexical/keyword booster (rerank)
         # Boost chunk scores if they contain exact match words from the query
-        stop_words = {"to", "in", "on", "at", "by", "of", "is", "it", "he", "me", "we", "us", "am", "an", "as", "if", "or", "so"}
+        stop_words = {
+            "to",
+            "in",
+            "on",
+            "at",
+            "by",
+            "of",
+            "is",
+            "it",
+            "he",
+            "me",
+            "we",
+            "us",
+            "am",
+            "an",
+            "as",
+            "if",
+            "or",
+            "so",
+        }
         query_words = {w for w in query.lower().split() if w not in stop_words}
         scored_chunks = []
         for chunk in chunks:
@@ -64,13 +88,13 @@ class RetrievalService:
             # Boost if query terms are in the file name
             filename = file_path_lower.split("/")[-1]
             for word in query_words:
-                if len(word) >= 2: # Match 2+ character technical terms (e.g. 'db', 'go', 'py')
+                if len(word) >= 2:  # Match 2+ character technical terms (e.g. 'db', 'go', 'py')
                     if word in filename:
-                        score += 0.15 # Strong filename match boost
+                        score += 0.15  # Strong filename match boost
                     elif word in content_lower:
-                        score += 0.05 # Lexical match boost
+                        score += 0.05  # Lexical match boost
 
-            chunk["score"] = min(score, 1.0) # Cap at 1.0
+            chunk["score"] = min(score, 1.0)  # Cap at 1.0
             scored_chunks.append(chunk)
 
         # Sort by updated score descending and limit to target size

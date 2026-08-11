@@ -7,7 +7,6 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from qdrant_client.http import models as rest_models
 
 from app.storage.vector_store import QdrantVectorStore
 
@@ -44,7 +43,7 @@ async def test_upsert_code_chunks(mock_client_class):
             "start_line": 1,
             "end_line": 2,
             "language": "python",
-            "is_ast": True
+            "is_ast": True,
         }
     ]
     embeddings = [[0.1] * 768]
@@ -81,7 +80,7 @@ async def test_search_code_chunks(mock_client_class):
         "content": "def hello(): pass",
         "start_line": 1,
         "end_line": 2,
-        "language": "python"
+        "language": "python",
     }
     mock_response.points = [mock_result]
     mock_client.query_points.return_value = mock_response
@@ -101,7 +100,7 @@ async def test_search_code_chunks(mock_client_class):
     mock_client.query_points.assert_called_once()
     kwargs = mock_client.query_points.call_args[1]
     query_filter = kwargs["query_filter"]
-    
+
     # Must contain user_id filter and repository_id filter
     must_conditions = query_filter.must
     assert len(must_conditions) == 2

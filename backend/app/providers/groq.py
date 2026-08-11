@@ -12,13 +12,11 @@ No additional SDK needed — standard `openai` package works with Groq.
 from collections.abc import AsyncGenerator
 from typing import cast
 
-import httpx
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 from app.config import settings
 from app.providers.base import (
-    EmbeddingProvider,
     LLMMessage,
     LLMProvider,
     LLMResponse,
@@ -37,9 +35,9 @@ class GroqProvider(LLMProvider):
     at Groq's base URL with a Groq API key.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, api_key: str | None = None) -> None:
         self._client = AsyncOpenAI(
-            api_key=settings.groq_api_key,
+            api_key=api_key or settings.groq_api_key,
             base_url=settings.groq_base_url,
         )
         self._model = settings.groq_llm_model
@@ -47,7 +45,10 @@ class GroqProvider(LLMProvider):
         self._default_max_tokens = settings.llm_max_tokens
 
     def _to_openai_messages(self, messages: list[LLMMessage]) -> list[ChatCompletionMessageParam]:
-        return cast(list[ChatCompletionMessageParam], [{"role": m.role, "content": m.content} for m in messages])
+        return cast(
+            list[ChatCompletionMessageParam],
+            [{"role": m.role, "content": m.content} for m in messages],
+        )
 
     async def generate(
         self,

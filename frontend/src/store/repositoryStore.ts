@@ -15,7 +15,7 @@ interface RepositoryState {
   fetchDocuments: () => Promise<void>;
 
   // Repo Actions
-  connectGithubRepo: (owner: string, name: string, language: string) => Promise<void>;
+  connectGithubRepo: (url: string) => Promise<void>;
   uploadLocalRepo: (name: string, size: string, language: string) => Promise<void>;
   deleteRepo: (id: string) => Promise<void>;
   reindexRepo: (id: string) => Promise<void>;
@@ -71,6 +71,8 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
         progress: r.progress,
         lastIndexedTime: r.updated_at ? new Date(r.updated_at).toLocaleString() : undefined,
         size: 'N/A',
+        rawStatus: r.status,
+        errorMessage: r.error_message,
       }));
 
       set({ repositories });
@@ -96,8 +98,8 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
           name: d.filename,
           type: d.file_type as Document['type'],
           size: sizeStr,
-          uploadProgress: d.status === 'ready' ? 100 : d.status === 'processing' ? 50 : 0,
-          status: d.status === 'ready' ? 'uploaded' : d.status === 'processing' ? 'uploading' : 'failed',
+          uploadProgress: d.status === 'ready' ? 100 : d.status === 'processing' ? 100 : 0,
+          status: d.status === 'ready' ? 'uploaded' : d.status === 'processing' ? 'processing' : 'failed',
           uploadedAt: new Date(d.created_at).toLocaleString(),
         };
       });
@@ -107,14 +109,33 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
     }
   },
 
-  connectGithubRepo: async (owner, name, language) => {
+  connectGithubRepo: async (url) => {
+    let owner = 'owner';
+    let name = 'repo';
+    try {
+      const parsedUrl = new URL(url);
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      if (pathParts.length >= 2) {
+        owner = pathParts[0];
+        name = pathParts[1].replace(/\.git$/, '');
+      } else if (pathParts.length === 1) {
+        name = pathParts[0].replace(/\.git$/, '');
+      }
+    } catch (e) {
+      const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (match) {
+        owner = match[1];
+        name = match[2].replace(/\.git$/, '');
+      }
+    }
+
     const tempId = `temp-${Math.random().toString(36).substring(2, 9)}`;
     const newRepo: Repository = {
       id: tempId,
       name,
       owner,
-      url: `https://github.com/${owner}/${name}`,
-      language,
+      url,
+      language: 'Detected',
       indexedFiles: 0,
       totalFiles: 0,
       status: 'indexing',
@@ -129,7 +150,7 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
     try {
       const response = await apiClient.post('/repos', {
         name,
-        url: `https://github.com/${owner}/${name}`,
+        url,
         source_type: 'github',
         description: `GitHub repository ${owner}/${name}`,
       });
@@ -143,6 +164,8 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
                 id: created.id,
                 status: mapRepoStatus(created.status),
                 progress: created.progress,
+                rawStatus: created.status,
+                errorMessage: created.error_message,
               }
             : r
         ),
@@ -163,6 +186,8 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
                     progress: updated.progress,
                     indexedFiles: updated.file_count || 0,
                     totalFiles: updated.file_count || 0,
+                    rawStatus: updated.status,
+                    errorMessage: updated.error_message,
                   }
                 : r
             ),
@@ -348,13 +373,28 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
             ? {
                 ...d,
                 id: uploadedDoc.id,
-                status: 'uploaded',
+                status: 'processing',
                 uploadProgress: 100,
                 uploadedAt: new Date(uploadedDoc.created_at).toLocaleString(),
               }
             : d
         ),
       }));
+
+      // Start document processing status polling
+      const pollInterval = setInterval(async () => {
+        try {
+          await get().fetchDocuments();
+          const currentDocs = get().documents;
+          const targetDoc = currentDocs.find(d => d.id === uploadedDoc.id);
+          // If complete or failed, stop polling
+          if (!targetDoc || targetDoc.status === 'uploaded' || targetDoc.status === 'failed') {
+            clearInterval(pollInterval);
+          }
+        } catch {
+          clearInterval(pollInterval);
+        }
+      }, 3000);
     } catch (e) {
       console.error('Failed to upload document file', e);
       set((state) => ({

@@ -4,17 +4,16 @@ DevAssist AI — FastAPI Application Factory
 Entry point for the API server.
 """
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 import sqlalchemy as sa
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.utils.logger import setup_logging, get_logger
 from app.storage.database import async_engine
-
+from app.utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -45,6 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize Qdrant collections
     try:
         from app.storage.vector_store import vector_store
+
         await vector_store.init_collections()
         logger.info("qdrant_initialized")
     except Exception as e:
@@ -52,7 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise
 
     # Warm up and health-check LLM + embedding providers
-    from app.providers.factory import get_llm_provider, get_embedding_provider
+    from app.providers.factory import get_embedding_provider, get_llm_provider
+
     llm = get_llm_provider()
     embed = get_embedding_provider()
 
@@ -66,7 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             hint="Check GROQ_API_KEY or ensure Ollama is running",
         )
     else:
-        logger.info("llm_provider_ready", provider=settings.llm_provider, model=settings.active_llm_model)
+        logger.info(
+            "llm_provider_ready", provider=settings.llm_provider, model=settings.active_llm_model
+        )
 
     if not embed_ok:
         logger.warning(
@@ -82,6 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("application_shutting_down")
     # Close vector store connection
     from app.storage.vector_store import vector_store
+
     await vector_store.close()
 
 
@@ -117,6 +121,7 @@ def create_app() -> FastAPI:
 
     # ── Register API Routers ──
     from app.api.router import api_router
+
     app.include_router(api_router, prefix="/api")
 
     return app

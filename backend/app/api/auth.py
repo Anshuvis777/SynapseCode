@@ -12,7 +12,9 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import AuthService, AuthError
+from app.api.dependencies import get_current_user
+from app.core.auth import AuthError, AuthService
+from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
     MeResponse,
@@ -22,8 +24,6 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.storage.database import get_db
-from app.api.dependencies import get_current_user
-from app.models.user import User
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

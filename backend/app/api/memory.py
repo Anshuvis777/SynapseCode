@@ -8,13 +8,14 @@ Endpoints:
 """
 
 import uuid
+
 from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies import get_current_user
 from app.models.user import User
+from app.providers.factory import get_embedding_provider
 from app.schemas.memory import MemoryCreate, MemoryResponse
 from app.storage.vector_store import vector_store
-from app.providers.factory import get_embedding_provider
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,11 +38,11 @@ async def create_memory(
     These are embedded and stored in Qdrant.
     """
     memory_id = uuid.uuid4()
-    
+
     # 1. Embed preference content
     embed_provider = get_embedding_provider()
     embedding = await embed_provider.embed_text(payload.content)
-    
+
     # 2. Upsert memory in Qdrant
     memory_data = {
         "id": memory_id,
@@ -53,7 +54,7 @@ async def create_memory(
         memories=[memory_data],
         embeddings=[embedding],
     )
-    
+
     logger.info("memory_created", memory_id=str(memory_id), user_id=str(current_user.id))
     return memory_data
 

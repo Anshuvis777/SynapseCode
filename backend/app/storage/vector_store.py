@@ -43,7 +43,11 @@ class QdrantVectorStore:
             try:
                 exists = await self.client.collection_exists(collection_name)
                 if not exists:
-                    logger.info("creating_qdrant_collection", collection=collection_name, dimensions=self.dims)
+                    logger.info(
+                        "creating_qdrant_collection",
+                        collection=collection_name,
+                        dimensions=self.dims,
+                    )
                     await self.client.create_collection(
                         collection_name=collection_name,
                         vectors_config=rest_models.VectorParams(
@@ -72,7 +76,9 @@ class QdrantVectorStore:
                 else:
                     logger.debug("qdrant_collection_exists", collection=collection_name)
             except UnexpectedResponse as e:
-                logger.error("qdrant_collection_init_failed", collection=collection_name, error=str(e))
+                logger.error(
+                    "qdrant_collection_init_failed", collection=collection_name, error=str(e)
+                )
                 raise
 
     async def upsert_code_chunks(
@@ -138,23 +144,22 @@ class QdrantVectorStore:
     ) -> list[dict[str, Any]]:
         """
         Perform a semantic vector search scoped strictly to the current user
-        and optionally scoped to a specific repository.
+        and strictly scoped to the specified repository/document context.
         """
-        # Build filter forcing user_id scope (tenant isolation)
+        if not repository_id:
+            return []
+
+        # Build filter forcing user_id AND repository_id scope (strict isolation)
         must_filters = [
             rest_models.FieldCondition(
                 key="user_id",
                 match=rest_models.MatchValue(value=str(user_id)),
-            )
+            ),
+            rest_models.FieldCondition(
+                key="repository_id",
+                match=rest_models.MatchValue(value=str(repository_id)),
+            ),
         ]
-
-        if repository_id:
-            must_filters.append(
-                rest_models.FieldCondition(
-                    key="repository_id",
-                    match=rest_models.MatchValue(value=str(repository_id)),
-                )
-            )
 
         query_filter = rest_models.Filter(must=must_filters)
 
@@ -169,11 +174,11 @@ class QdrantVectorStore:
             {
                 "id": r.id,
                 "score": r.score,
-                "file_path": r.payload.get("file_path"), # type: ignore
-                "content": r.payload.get("content"), # type: ignore
-                "start_line": r.payload.get("start_line"), # type: ignore
-                "end_line": r.payload.get("end_line"), # type: ignore
-                "language": r.payload.get("language"), # type: ignore
+                "file_path": r.payload.get("file_path"),  # type: ignore
+                "content": r.payload.get("content"),  # type: ignore
+                "start_line": r.payload.get("start_line"),  # type: ignore
+                "end_line": r.payload.get("end_line"),  # type: ignore
+                "language": r.payload.get("language"),  # type: ignore
             }
             for r in response.points
         ]
@@ -183,7 +188,9 @@ class QdrantVectorStore:
         Delete all vectors associated with a specific repository.
         Requires user_id for tenant verification.
         """
-        logger.info("deleting_vectors_by_repository", repo_id=str(repository_id), user_id=str(user_id))
+        logger.info(
+            "deleting_vectors_by_repository", repo_id=str(repository_id), user_id=str(user_id)
+        )
         await self.client.delete(
             collection_name=self.collection_chunks,
             points_selector=rest_models.FilterSelector(
@@ -269,8 +276,8 @@ class QdrantVectorStore:
             {
                 "id": r.id,
                 "score": r.score,
-                "content": r.payload.get("content"), # type: ignore
-                "category": r.payload.get("category"), # type: ignore
+                "content": r.payload.get("content"),  # type: ignore
+                "category": r.payload.get("category"),  # type: ignore
             }
             for r in response.points
         ]
@@ -290,9 +297,7 @@ class QdrantVectorStore:
                             key="user_id",
                             match=rest_models.MatchValue(value=str(user_id)),
                         ),
-                        rest_models.HasIdCondition(
-                            has_id=[str(memory_id)]
-                        )
+                        rest_models.HasIdCondition(has_id=[str(memory_id)]),
                     ]
                 )
             ),
@@ -324,8 +329,8 @@ class QdrantVectorStore:
         return [
             {
                 "id": uuid.UUID(p.id) if isinstance(p.id, str) else p.id,
-                "content": p.payload.get("content"), # type: ignore
-                "category": p.payload.get("category", "general"), # type: ignore
+                "content": p.payload.get("content"),  # type: ignore
+                "category": p.payload.get("category", "general"),  # type: ignore
             }
             for p in points
         ]

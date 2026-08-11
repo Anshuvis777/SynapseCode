@@ -36,7 +36,9 @@ def override_auth(mock_user):
 
 @pytest.mark.asyncio
 @patch("app.api.search.retrieval_service")
-async def test_search_codebase_success(mock_retrieval, client, mock_user, db_session, override_auth):
+async def test_search_codebase_success(
+    mock_retrieval, client, mock_user, db_session, override_auth
+):
     # Setup database state
     db_session.add(mock_user)
     await db_session.flush()
@@ -52,24 +54,21 @@ async def test_search_codebase_success(mock_retrieval, client, mock_user, db_ses
     await db_session.flush()
 
     # Mock retrieval service results
-    mock_retrieval.retrieve_context = AsyncMock(return_value=[
-        {
-            "file_path": "src/index.js",
-            "content": "const express = require('express');",
-            "start_line": 1,
-            "end_line": 2,
-            "language": "javascript",
-            "score": 0.85
-        }
-    ])
+    mock_retrieval.retrieve_context = AsyncMock(
+        return_value=[
+            {
+                "file_path": "src/index.js",
+                "content": "const express = require('express');",
+                "start_line": 1,
+                "end_line": 2,
+                "language": "javascript",
+                "score": 0.85,
+            }
+        ]
+    )
 
     response = await client.get(
-        "/api/search",
-        params={
-            "repo_id": str(repo_id),
-            "q": "express server setup",
-            "limit": 5
-        }
+        "/api/search", params={"repo_id": str(repo_id), "q": "express server setup", "limit": 5}
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -89,14 +88,16 @@ async def test_search_codebase_success(mock_retrieval, client, mock_user, db_ses
 
 
 @pytest.mark.asyncio
-async def test_search_codebase_unauthorized_repository(client, mock_user, db_session, override_auth):
+async def test_search_codebase_unauthorized_repository(
+    client, mock_user, db_session, override_auth
+):
     db_session.add(mock_user)
     await db_session.flush()
 
     # Create repository owned by a different user
     repo = Repository(
         id=uuid.uuid4(),
-        user_id=uuid.uuid4(), # different user id
+        user_id=uuid.uuid4(),  # different user id
         name="project-beta",
         status="completed",
     )
@@ -108,7 +109,7 @@ async def test_search_codebase_unauthorized_repository(client, mock_user, db_ses
         params={
             "repo_id": str(repo.id),
             "q": "some query",
-        }
+        },
     )
 
     # Should deny access since repo belongs to a different user

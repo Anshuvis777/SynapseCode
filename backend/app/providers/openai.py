@@ -31,14 +31,17 @@ class OpenAIProvider(LLMProvider):
     Optional — only used when user explicitly sets LLM_PROVIDER=openai.
     """
 
-    def __init__(self) -> None:
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+    def __init__(self, api_key: str | None = None) -> None:
+        self._client = AsyncOpenAI(api_key=api_key or settings.openai_api_key)
         self._model = settings.openai_llm_model
         self._default_temperature = settings.llm_temperature
         self._default_max_tokens = settings.llm_max_tokens
 
     def _to_openai_messages(self, messages: list[LLMMessage]) -> list[ChatCompletionMessageParam]:
-        return cast(list[ChatCompletionMessageParam], [{"role": m.role, "content": m.content} for m in messages])
+        return cast(
+            list[ChatCompletionMessageParam],
+            [{"role": m.role, "content": m.content} for m in messages],
+        )
 
     async def generate(
         self,

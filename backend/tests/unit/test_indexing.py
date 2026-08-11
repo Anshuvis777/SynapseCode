@@ -61,7 +61,7 @@ async def test_async_index_repository_success(
 
     # Mock cloner path
     mock_clone.return_value = MagicMock()
-    
+
     # Mock parser chunks output
     mock_parse.return_value = [
         {
@@ -77,25 +77,26 @@ async def test_async_index_repository_success(
             "start_line": 1,
             "end_line": 2,
             "language": "python",
-        }
+        },
     ]
 
     # Mock embedding provider output
     mock_embed_provider = MagicMock()
-    mock_embed_provider.embed_batch = AsyncMock(return_value=[[0.1]*768, [0.2]*768])
+    mock_embed_provider.embed_batch = AsyncMock(return_value=[[0.1] * 768, [0.2] * 768])
     mock_get_embed.return_value = mock_embed_provider
 
     # Mock Qdrant upsert
     mock_vector_store.upsert_code_chunks = AsyncMock()
 
     # Patch AsyncSessionLocal with local session maker
-    with patch("app.workers.tasks.AsyncSessionLocal", local_sessionmaker), \
-         patch("app.workers.tasks.shutil.rmtree") as mock_rmtree:
-        
+    with (
+        patch("app.workers.tasks.AsyncSessionLocal", local_sessionmaker),
+        patch("app.workers.tasks.shutil.rmtree") as mock_rmtree,
+    ):
         success = await _async_index_repository(mock_repo.id, mock_user.id)
-        
+
         assert success is True
-        
+
         # Verify db_session state was updated to completed
         async with local_sessionmaker() as session:
             repo = await session.get(Repository, mock_repo.id)

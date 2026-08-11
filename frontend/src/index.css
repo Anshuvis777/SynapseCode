@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @layer base {
@@ -12,17 +13,17 @@
     padding: 0;
     width: 100%;
     height: 100%;
-    background-color: #09090b; /* Zinc-950 */
+    background-color: #060608; /* Deep flat dark background */
     color: #f4f4f5; /* Zinc-100 */
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom Scrollbar styling */
+  /* Flat custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
@@ -30,29 +31,81 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #27272a; /* zinc-800 */
-    border-radius: 4px;
+    background: #1f1f23;
+    border-radius: 2px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f46; /* zinc-700 */
+    background: #2e2e35;
   }
 }
 
-/* Animations for Chat Streaming & UI polish */
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+/* Minimalist Card & Panel classes - Flat style */
+.minimal-card {
+  background-color: #0d0d10; /* Solid dark grey */
+  border: 1px solid #1c1c21; /* Solid thin border */
+  border-radius: 8px;
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.minimal-card-hover:hover {
+  border-color: #2e2e36;
+  background-color: #111115;
+  transition: all 0.2s ease-in-out;
 }
 
-/* Custom styles for Code syntax block or specific Markdown features if needed */
-.prose-code-block pre {
-  margin: 0;
-  padding: 1rem;
-  overflow-x: auto;
-  border-radius: 0.375rem;
+/* Minimalist navigation links */
+.nav-link-active {
+  background-color: #17171c !important;
+  color: #ffffff !important;
+  border-left: 2px solid #3b82f6;
+}
+
+/* Status Badges - Flat Pill Style */
+.badge-synced {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badge-syncing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badge-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badge-synced::before,
+.badge-syncing::before,
+.badge-error::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
 }

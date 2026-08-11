@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True)
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
-    cors_origins: str = Field(default="http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000")
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000"
+    )
 
     # ── Authentication (JWT — free, self-issued) ────────────────
     jwt_secret_key: str = Field(default="CHANGE_ME_TO_A_RANDOM_64_CHAR_STRING")
@@ -95,13 +97,13 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=0.1)
     # Keep low to preserve daily token budget on free tier
     llm_max_tokens: int = Field(default=1024)
-    llm_top_k_chunks: int = Field(default=6)   # 6 chunks × 512 ≈ 3k context tokens
-    embedding_dimensions: int = Field(default=768)  # nomic-embed-text
+    llm_top_k_chunks: int = Field(default=6)  # 6 chunks × 512 ≈ 3k context tokens
+    embedding_dimensions: int = Field(default=384)  # BAAI/bge-small-en-v1.5
 
     # ── Indexing ────────────────────────────────────────────────
     max_repo_size_mb: int = Field(default=500)
     max_file_size_kb: int = Field(default=1024)
-    chunk_size_tokens: int = Field(default=512)   # smaller = more chunks, less context
+    chunk_size_tokens: int = Field(default=512)  # smaller = more chunks, less context
     chunk_overlap_tokens: int = Field(default=64)
     embedding_batch_size: int = Field(default=50)
 

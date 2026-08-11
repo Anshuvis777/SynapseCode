@@ -8,9 +8,7 @@ import { DashboardOverview } from './pages/DashboardOverview';
 import { Chat } from './pages/Chat';
 import { Repositories } from './pages/Repositories';
 import { Documents } from './pages/Documents';
-import { Search } from './pages/Search';
 import { Memory } from './pages/Memory';
-import { Settings } from './pages/Settings';
 import { ToastContainer } from './components/ui/Toast';
 
 const queryClient = new QueryClient({
@@ -53,9 +51,7 @@ function App() {
             <Route path="chat" element={<Chat />} />
             <Route path="repositories" element={<Repositories />} />
             <Route path="documents" element={<Documents />} />
-            <Route path="search" element={<Search />} />
             <Route path="memory" element={<Memory />} />
-            <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>

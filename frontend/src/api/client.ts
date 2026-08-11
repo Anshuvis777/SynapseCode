@@ -20,6 +20,13 @@ apiClient.interceptors.request.use(
         if (user.token) {
           config.headers.Authorization = `Bearer ${user.token}`;
         }
+        if (user.llmProvider) {
+          config.headers['X-LLM-Provider'] = user.llmProvider;
+        }
+        const activeKey = user.llmProvider === 'openai' ? user.openaiApiKey : user.groqApiKey;
+        if (activeKey) {
+          config.headers['X-LLM-API-Key'] = activeKey;
+        }
       } catch (e) {
         console.error('Error parsing stored user for auth token', e);
       }

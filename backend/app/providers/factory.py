@@ -23,47 +23,38 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-@lru_cache(maxsize=1)
-def get_llm_provider() -> LLMProvider:
-    """
-    Return the configured LLM provider singleton.
+def _create_llm_provider(provider: str | None = None, api_key: str | None = None) -> LLMProvider:
+    provider_name = (provider or settings.llm_provider).lower()
 
-    Provider is selected based on LLM_PROVIDER env var:
-      - "groq"   → GroqProvider   (FREE — default)
-      - "openai" → OpenAIProvider (paid, optional)
-      - "ollama" → OllamaProvider (local, optional)
-    """
-    provider = settings.llm_provider.lower()
-
-    match provider:
+    match provider_name:
         case "groq":
             from app.providers.groq import GroqProvider
+
             logger.info("llm_provider_selected", provider="groq", model=settings.groq_llm_model)
-            return GroqProvider()
+            return GroqProvider(api_key=api_key)
 
         case "openai":
-            if not settings.openai_api_key:
+            key = api_key or settings.openai_api_key
+            if not key:
                 raise ValueError(
-                    "LLM_PROVIDER=openai but OPENAI_API_KEY is not set. "
+                    "LLM_PROVIDER=openai but OPENAI_API_KEY / custom key is not set. "
                     "Either set the key or switch to LLM_PROVIDER=groq (free)."
                 )
             from app.providers.openai import OpenAIProvider
+
             logger.info("llm_provider_selected", provider="openai", model=settings.openai_llm_model)
-            return OpenAIProvider()
+            return OpenAIProvider(api_key=key)
 
         case "ollama":
             # Ollama as LLM (generate via Ollama API using openai-compat)
             from app.providers.groq import GroqProvider
-            from openai import AsyncOpenAI
-            import types
 
-            # For Ollama LLM, reuse GroqProvider logic with Ollama endpoint
-            # Ollama exposes OpenAI-compatible API at /v1
             logger.info("llm_provider_selected", provider="ollama", model=settings.ollama_llm_model)
 
             class OllamaLLMProvider(GroqProvider):
                 def __init__(self) -> None:
                     from openai import AsyncOpenAI
+
                     self._client = AsyncOpenAI(
                         api_key="ollama",
                         base_url=f"{settings.ollama_base_url}/v1",
@@ -76,9 +67,24 @@ def get_llm_provider() -> LLMProvider:
 
         case _:
             raise ValueError(
-                f"Unknown LLM_PROVIDER: '{provider}'. "
-                "Supported: groq (free), openai, ollama"
+                f"Unknown LLM_PROVIDER: '{provider_name}'. Supported: groq (free), openai, ollama"
             )
+
+
+@lru_cache(maxsize=1)
+def _get_cached_llm_provider() -> LLMProvider:
+    return _create_llm_provider()
+
+
+def get_llm_provider(provider: str | None = None, api_key: str | None = None) -> LLMProvider:
+    """
+    Return the configured LLM provider.
+    If a custom provider or api_key is supplied, return a new provider instance.
+    Otherwise, return the cached default provider singleton.
+    """
+    if provider or api_key:
+        return _create_llm_provider(provider=provider, api_key=api_key)
+    return _get_cached_llm_provider()
 
 
 @lru_cache(maxsize=1)
@@ -95,10 +101,9 @@ def get_embedding_provider() -> EmbeddingProvider:
 
     if provider == "openai":
         if not settings.openai_api_key:
-            raise ValueError(
-                "EMBEDDING_PROVIDER=openai but OPENAI_API_KEY is not set."
-            )
+            raise ValueError("EMBEDDING_PROVIDER=openai but OPENAI_API_KEY is not set.")
         from app.providers.openai import OpenAIEmbeddingProvider
+
         logger.info(
             "embedding_provider_selected",
             provider="openai",
@@ -108,6 +113,7 @@ def get_embedding_provider() -> EmbeddingProvider:
 
     elif provider == "ollama":
         from app.providers.embeddings import OllamaEmbeddingProvider
+
         logger.info(
             "embedding_provider_selected",
             provider="ollama",
@@ -117,6 +123,7 @@ def get_embedding_provider() -> EmbeddingProvider:
 
     else:
         from app.providers.embeddings import FastEmbedEmbeddingProvider
+
         logger.info(
             "embedding_provider_selected",
             provider="fastembed",
@@ -127,5 +134,5 @@ def get_embedding_provider() -> EmbeddingProvider:
 
 def clear_provider_cache() -> None:
     """Clear cached providers — used in tests to reset state."""
-    get_llm_provider.cache_clear()
+    _get_cached_llm_provider.cache_clear()
     get_embedding_provider.cache_clear()

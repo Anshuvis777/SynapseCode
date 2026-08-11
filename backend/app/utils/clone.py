@@ -39,7 +39,8 @@ async def clone_repository(repo_url: str, repo_id: str) -> Path:
     cmd = [
         "git",
         "clone",
-        "--depth", "1",
+        "--depth",
+        "1",
         "--single-branch",
         repo_url,
         str(target_dir),

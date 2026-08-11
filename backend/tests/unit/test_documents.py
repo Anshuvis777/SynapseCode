@@ -54,7 +54,7 @@ async def test_upload_document_success(
     response = await client.post(
         "/api/documents",
         files={"file": ("config_doc.txt", file_obj, "text/plain")},
-        data={"repo_id": str(uuid.uuid4())}
+        data={"repo_id": str(uuid.uuid4())},
     )
 
     assert response.status_code == status.HTTP_201_CREATED
@@ -88,13 +88,10 @@ async def test_ingest_url_success(
     mock_response.text = "<html><body><h1>Guide</h1><p>Setup instructions here.</p></body></html>"
     mock_get.return_value = mock_response
 
-    payload = {
-        "url": "https://example.com/guide",
-        "repo_id": str(uuid.uuid4())
-    }
+    payload = {"url": "https://example.com/guide", "repo_id": str(uuid.uuid4())}
 
     response = await client.post("/api/documents/url", json=payload)
-    
+
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert "web_example.com" in data["filename"]
@@ -115,7 +112,7 @@ async def test_celery_process_document_task(
     from app.workers.tasks import _async_process_document
 
     local_sessionmaker = async_sessionmaker(test_engine, expire_on_commit=False)
-    
+
     # Save a mock user and document record to database
     async with local_sessionmaker() as db:
         db.add(mock_user)
@@ -159,5 +156,6 @@ async def test_celery_process_document_task(
 
     # Cleanup temp file
     import os
+
     if os.path.exists(temp_file_path):
         os.remove(temp_file_path)

@@ -12,14 +12,16 @@ import os
 import re
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+
+import httpx
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
 
 from app.api.dependencies import get_current_user
-from app.models.user import User
+from app.config import settings
 from app.models.document import Document
+from app.models.user import User
 from app.schemas.document import DocumentResponse, URLIngestPayload
 from app.storage.database import get_db
 from app.utils.logger import get_logger
@@ -29,8 +31,13 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Local storage path for uploaded files
-STORAGE_DIR = Path("/home/anshu-kumar/AI/backend/storage/documents")
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+STORAGE_DIR = Path(settings.document_storage_path)
+try:
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    # Fallback to local workspace if /app path is not writable (running locally outside Docker)
+    STORAGE_DIR = Path(__file__).parents[2] / "storage" / "documents"
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 SUPPORTED_TYPES = {
     "text/plain": "txt",
@@ -45,11 +52,16 @@ SUPPORTED_TYPES = {
 def clean_html(html_content: str) -> str:
     """Removes HTML tags and returns clean plain text."""
     # Remove scripts, styles, and headers/footers
-    clean = re.sub(r'<(script|style|header|footer|nav|noscript)[^>]*>([\s\S]*?)<\/\1>', ' ', html_content, flags=re.IGNORECASE)
+    clean = re.sub(
+        r"<(script|style|header|footer|nav|noscript)[^>]*>([\s\S]*?)<\/\1>",
+        " ",
+        html_content,
+        flags=re.IGNORECASE,
+    )
     # Remove all HTML tags
-    clean = re.sub(r'<[^>]+>', ' ', clean)
+    clean = re.sub(r"<[^>]+>", " ", clean)
     # Collapse multiple whitespaces
-    clean = re.sub(r'\s+', ' ', clean)
+    clean = re.sub(r"\s+", " ", clean)
     return clean.strip()
 
 
@@ -116,6 +128,7 @@ async def upload_document(
 
     # 3. Fire Celery background parsing and embedding task
     from app.workers.tasks import process_document_task
+
     process_document_task.delay(str(doc.id))
 
     logger.info("document_upload_registered", doc_id=str(doc.id), filename=filename)
@@ -159,7 +172,7 @@ async def ingest_url(
 
     doc_id = uuid.uuid4()
     # Create simple readable filename from URL
-    domain = re.sub(r'https?://(www\.)?', '', payload.url).split('/')[0]
+    domain = re.sub(r"https?://(www\.)?", "", payload.url).split("/")[0]
     filename = f"web_{domain}_{doc_id.hex[:6]}.txt"
     storage_path = STORAGE_DIR / filename
 
@@ -190,6 +203,7 @@ async def ingest_url(
 
     # 5. Fire Celery background task
     from app.workers.tasks import process_document_task
+
     process_document_task.delay(str(doc.id))
 
     logger.info("url_ingestion_registered", doc_id=str(doc.id), url=payload.url)
@@ -208,7 +222,11 @@ async def list_documents(
     """
     List all documents uploaded by the user.
     """
-    query = select(Document).where(Document.user_id == current_user.id).order_by(Document.created_at.desc())
+    query = (
+        select(Document)
+        .where(Document.user_id == current_user.id)
+        .order_by(Document.created_at.desc())
+    )
     result = await db.execute(query)
     return list(result.scalars().all())
 
@@ -240,8 +258,10 @@ async def delete_document(
 
     # 2. Delete from Qdrant Vector Store
     # We delete by searching points containing filename as file_path payload parameter in chunk collection
-    from app.storage.vector_store import vector_store
     from qdrant_client.http import models as rest_models
+
+    from app.storage.vector_store import vector_store
+
     try:
         await vector_store.client.delete(
             collection_name=vector_store.collection_chunks,

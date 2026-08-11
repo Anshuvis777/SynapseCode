@@ -4,6 +4,10 @@ export interface User {
   name: string;
   avatarUrl?: string;
   token?: string;
+  apiKey?: string;
+  llmProvider?: 'groq' | 'openai';
+  groqApiKey?: string;
+  openaiApiKey?: string;
 }
 
 export type MessageRole = 'user' | 'assistant';
@@ -61,6 +65,8 @@ export interface Repository {
   progress?: number; // 0 to 100
   lastIndexedTime?: string;
   size?: string;
+  rawStatus?: string;
+  errorMessage?: string;
 }
 
 export interface Document {
@@ -69,7 +75,7 @@ export interface Document {
   type: 'pdf' | 'markdown' | 'docx' | 'txt' | 'other';
   size: string;
   uploadProgress: number; // 0 to 100
-  status: 'uploaded' | 'uploading' | 'failed';
+  status: 'uploaded' | 'uploading' | 'failed' | 'processing';
   uploadedAt: string;
 }
 

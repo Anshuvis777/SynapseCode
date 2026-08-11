@@ -9,13 +9,13 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.mixins import TimestampMixin, UUIDMixin
 from app.storage.database import Base
-from app.models.mixins import UUIDMixin, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.session import Session
     from app.models.document import Document
+    from app.models.session import Session
+    from app.models.user import User
 
 
 class Repository(UUIDMixin, TimestampMixin, Base):
@@ -48,9 +48,7 @@ class Repository(UUIDMixin, TimestampMixin, Base):
 
     # ── Indexing State ──────────────────────────────────────────
     # pending → cloning → parsing → embedding → ready | error
-    status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="pending", index=True
-    )
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending", index=True)
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -61,12 +59,8 @@ class Repository(UUIDMixin, TimestampMixin, Base):
 
     # ── Relationships ───────────────────────────────────────────
     user: Mapped["User"] = relationship("User", back_populates="repositories")
-    sessions: Mapped[list["Session"]] = relationship(
-        "Session", back_populates="repository"
-    )
-    documents: Mapped[list["Document"]] = relationship(
-        "Document", back_populates="repository"
-    )
+    sessions: Mapped[list["Session"]] = relationship("Session", back_populates="repository")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="repository")
 
     def __repr__(self) -> str:
         return f"<Repository id={self.id} name={self.name} status={self.status}>"

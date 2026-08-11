@@ -42,8 +42,7 @@ services:
     command: >
       celery -A app.workers.celery_app worker
       --loglevel=info
-      --concurrency=2
-      --pool=prefork
+      --pool=solo
     volumes:
       - .:/app
       - repo_storage:/app/storage/repos

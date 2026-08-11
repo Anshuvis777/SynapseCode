@@ -5,17 +5,13 @@ Integration tests require a running PostgreSQL instance.
 Set DATABASE_URL env var to point to a test database.
 """
 
-import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.storage.database import Base, get_db
-from app.config import settings
-
-
-from sqlalchemy.pool import StaticPool
 
 # Use a local in-memory SQLite database for fast isolated unit tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -42,10 +38,9 @@ async def test_engine():
 async def db_session(test_engine):
     """Provide a transactional DB session per test — rolls back after."""
     async_session = async_sessionmaker(test_engine, expire_on_commit=False)
-    async with async_session() as session:
-        async with session.begin():
-            yield session
-            await session.rollback()
+    async with async_session() as session, session.begin():
+        yield session
+        await session.rollback()
 
 
 @pytest_asyncio.fixture

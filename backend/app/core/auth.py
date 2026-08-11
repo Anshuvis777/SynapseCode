@@ -7,21 +7,27 @@ Separated from the HTTP layer so it's testable in isolation.
 
 import uuid
 
+import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.schemas.auth import RegisterRequest, LoginRequest
-from app.utils.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.schemas.auth import LoginRequest, RegisterRequest
 from app.utils.logger import get_logger
-
-import jwt
+from app.utils.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 
 logger = get_logger(__name__)
 
 
 class AuthError(Exception):
     """Raised for authentication failures — caught by the router."""
+
     def __init__(self, message: str, status_code: int = 401):
         self.message = message
         self.status_code = status_code
@@ -42,9 +48,7 @@ class AuthService:
             AuthError(409) — if email already exists
         """
         # Check uniqueness
-        existing = await self.db.scalar(
-            select(User).where(User.email == payload.email)
-        )
+        existing = await self.db.scalar(select(User).where(User.email == payload.email))
         if existing:
             raise AuthError("Email already registered", status_code=409)
 
@@ -68,9 +72,7 @@ class AuthService:
         Raises:
             AuthError(401) — invalid credentials
         """
-        user = await self.db.scalar(
-            select(User).where(User.email == payload.email)
-        )
+        user = await self.db.scalar(select(User).where(User.email == payload.email))
 
         if not user or not verify_password(payload.password, user.hashed_password):
             raise AuthError("Invalid email or password", status_code=401)

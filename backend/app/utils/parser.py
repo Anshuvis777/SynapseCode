@@ -6,7 +6,6 @@ detects programming languages, and chunks source files into semantic windows
 suitable for embeddings and vector storage.
 """
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -117,14 +116,16 @@ def chunk_file_content(
 
     # If the file is smaller than target chunk size, return it as a single chunk
     if total_lines <= chunk_size_lines:
-        chunks.append({
-            "file_path": file_path_rel,
-            "content": content,
-            "start_line": 1,
-            "end_line": total_lines,
-            "language": language,
-            "is_ast": False,
-        })
+        chunks.append(
+            {
+                "file_path": file_path_rel,
+                "content": content,
+                "start_line": 1,
+                "end_line": total_lines,
+                "language": language,
+                "is_ast": False,
+            }
+        )
         return chunks
 
     start = 0
@@ -133,14 +134,16 @@ def chunk_file_content(
         chunk_lines = lines[start:end]
         chunk_content = "\n".join(chunk_lines)
 
-        chunks.append({
-            "file_path": file_path_rel,
-            "content": chunk_content,
-            "start_line": start + 1,
-            "end_line": end,
-            "language": language,
-            "is_ast": False,
-        })
+        chunks.append(
+            {
+                "file_path": file_path_rel,
+                "content": chunk_content,
+                "start_line": start + 1,
+                "end_line": end,
+                "language": language,
+                "is_ast": False,
+            }
+        )
 
         # Slide the window forward
         start += chunk_size_lines - overlap_lines
@@ -174,7 +177,7 @@ def parse_repository(root_dir: Path) -> list[dict[str, Any]]:
 
         try:
             # Safely read text content
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 content = f.read()
 
             file_count += 1
@@ -184,5 +187,7 @@ def parse_repository(root_dir: Path) -> list[dict[str, Any]]:
         except Exception as e:
             logger.warning("failed_to_parse_file", file=relative_path, error=str(e))
 
-    logger.info("repository_parsing_complete", files_parsed=file_count, chunks_created=len(all_chunks))
+    logger.info(
+        "repository_parsing_complete", files_parsed=file_count, chunks_created=len(all_chunks)
+    )
     return all_chunks

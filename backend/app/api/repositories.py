@@ -9,22 +9,23 @@ Endpoints:
   POST /api/repos/{id}/index — Re-index repository
 """
 
-import uuid
 import shutil
+import uuid
 from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
-from app.models.user import User
+from app.config import settings
 from app.models.repository import Repository
+from app.models.user import User
 from app.schemas.repository import RepositoryCreate, RepositoryResponse
 from app.storage.database import get_db
 from app.storage.vector_store import vector_store
-from app.workers.tasks import index_repository_task
-from app.config import settings
 from app.utils.logger import get_logger
+from app.workers.tasks import index_repository_task
 
 logger = get_logger(__name__)
 

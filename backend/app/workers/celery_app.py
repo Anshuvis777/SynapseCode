@@ -23,7 +23,7 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     # Clean up orphan tasks
-    result_expires=86400, # 24 hours
+    result_expires=86400,  # 24 hours
     # Auto-discover tasks from the app.workers package
     imports=[
         "app.workers.tasks",

@@ -1,0 +1,130 @@
+services:
+  # ===========================================
+  # Nginx Reverse Proxy & Static Web Server
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+    networks:
+      - codexrag_net
+
+  # ===========================================
+  # FastAPI Application Server
+  # ===========================================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level info
+    env_file:
+      - ./backend/.env.production
+    volumes:
+      - repo_storage:/app/storage/repos
+      - doc_storage:/app/storage/documents
+      - fastembed_cache:/root/.cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - codexrag_net
+
+  # ===========================================
+  # Celery Background Indexing Worker
+  # ===========================================
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: celery -A app.workers.celery_app worker --loglevel=info --pool=solo
+    env_file:
+      - ./backend/.env.production
+    volumes:
+      - repo_storage:/app/storage/repos
+      - doc_storage:/app/storage/documents
+      - fastembed_cache:/root/.cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - codexrag_net
+
+  # ===========================================
+  # PostgreSQL Database (Internal only)
+  # ===========================================
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devassist_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devassist_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-devassist_prod_db}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devassist_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codexrag_net
+
+  # ===========================================
+  # Qdrant Vector Database (Internal only)
+  # ===========================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: always
+    volumes:
+      - qdrant_prod_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    networks:
+      - codexrag_net
+
+  # ===========================================
+  # Redis (Cache + Task Broker - Internal only)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - codexrag_net
+
+volumes:
+  postgres_prod_data:
+  qdrant_prod_data:
+  redis_prod_data:
+  fastembed_cache:
+  repo_storage:
+  doc_storage:
+
+networks:
+  codexrag_net:
+    driver: bridge

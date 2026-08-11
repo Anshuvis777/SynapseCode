@@ -5,11 +5,11 @@ JWT token creation/verification and password hashing.
 Uses PyJWT + passlib[bcrypt]. No paid services.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import jwt
 import bcrypt
+import jwt
 
 from app.config import settings
 from app.utils.logger import get_logger
@@ -36,9 +36,10 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── JWT tokens ──────────────────────────────────────────────────
 
+
 def _create_token(payload: dict[str, Any], expires_delta: timedelta) -> str:
     """Internal: sign a JWT with expiry."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     data = {
         **payload,
         "iat": now,

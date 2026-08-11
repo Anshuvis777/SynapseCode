@@ -2,7 +2,6 @@
 Unit tests for Chat API Session and Streaming message endpoints.
 """
 
-import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,7 +12,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.api.dependencies import get_current_user
 from app.main import app
 from app.models.session import Session
-from app.models.message import Message
 from app.models.user import User
 
 
@@ -43,13 +41,10 @@ async def test_create_chat_session(client, mock_user, db_session, override_auth)
     await db_session.flush()
 
     repo_id = uuid.uuid4()
-    payload = {
-        "repository_id": str(repo_id),
-        "title": "Debug Build Failure"
-    }
+    payload = {"repository_id": str(repo_id), "title": "Debug Build Failure"}
 
     response = await client.post("/api/chat/sessions", json=payload)
-    
+
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data["title"] == "Debug Build Failure"
@@ -63,16 +58,13 @@ async def test_list_chat_sessions(client, mock_user, db_session, override_auth):
 
     repo_id = uuid.uuid4()
     session = Session(
-        id=uuid.uuid4(),
-        user_id=mock_user.id,
-        repo_id=repo_id,
-        title="Refactoring Helpers"
+        id=uuid.uuid4(), user_id=mock_user.id, repo_id=repo_id, title="Refactoring Helpers"
     )
     db_session.add(session)
     await db_session.flush()
 
     response = await client.get("/api/chat/sessions")
-    
+
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert len(data) == 1
@@ -92,31 +84,30 @@ async def test_send_message_streaming_sse(
 ):
     # Setup database records using a fresh non-transactional session maker
     local_sessionmaker = async_sessionmaker(test_engine, expire_on_commit=False)
-    
+
     async with local_sessionmaker() as db:
         db.add(mock_user)
         await db.commit()
-        
+
         session = Session(
-            id=uuid.uuid4(),
-            user_id=mock_user.id,
-            repo_id=uuid.uuid4(),
-            title="Streaming Test"
+            id=uuid.uuid4(), user_id=mock_user.id, repo_id=uuid.uuid4(), title="Streaming Test"
         )
         db.add(session)
         await db.commit()
 
     # Mock retrieval service results
-    mock_retrieval.retrieve_context = AsyncMock(return_value=[
-        {
-            "file_path": "main.py",
-            "start_line": 1,
-            "end_line": 10,
-            "language": "python",
-            "score": 0.9,
-            "content": "def main(): print('hello')"
-        }
-    ])
+    mock_retrieval.retrieve_context = AsyncMock(
+        return_value=[
+            {
+                "file_path": "main.py",
+                "start_line": 1,
+                "end_line": 10,
+                "language": "python",
+                "score": 0.9,
+                "content": "def main(): print('hello')",
+            }
+        ]
+    )
     mock_retrieval.format_context_prompt = MagicMock(return_value="mocked context")
 
     # Mock LLM stream generator
@@ -124,6 +115,7 @@ async def test_send_message_streaming_sse(
         class MockChunk:
             def __init__(self, delta):
                 self.delta = delta
+
         yield MockChunk("I can ")
         yield MockChunk("help with ")
         yield MockChunk("that.")
@@ -142,15 +134,16 @@ async def test_send_message_streaming_sse(
             async with local_sessionmaker() as db:
                 yield db
                 await db.commit()
-        
+
         app.dependency_overrides[get_db] = override_get_db
-        
+
         try:
             # Request Streaming via stream context manager in HTTPX
             async with client.stream(
-                "POST", 
+                "POST",
                 f"/api/chat/sessions/{session.id}/messages",
-                json={"content": "Explain main function"}
+                json={"content": "Explain main function"},
+                headers={"X-LLM-API-Key": "test-mock-groq-key"},
             ) as response:
                 assert response.status_code == status.HTTP_200_OK
                 assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
@@ -165,7 +158,7 @@ async def test_send_message_streaming_sse(
                 assert "sources" in lines[0]
                 assert "I can " in lines[1]
                 assert "help with " in lines[2]
-                
+
         finally:
             if get_db in app.dependency_overrides:
                 del app.dependency_overrides[get_db]

@@ -6,16 +6,17 @@ Endpoints:
 """
 
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
-from app.models.user import User
 from app.models.repository import Repository
+from app.models.user import User
 from app.schemas.search import SearchResultResponse
-from app.storage.database import get_db
 from app.services.retrieval import RetrievalService
+from app.storage.database import get_db
 
 router = APIRouter()
 retrieval_service = RetrievalService()

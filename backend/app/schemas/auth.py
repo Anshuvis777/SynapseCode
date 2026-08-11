@@ -5,10 +5,11 @@ Request/response models for authentication endpoints.
 """
 
 import uuid
-from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from pydantic import BaseModel, EmailStr, Field
 
 # ── Request schemas ─────────────────────────────────────────────
+
 
 class RegisterRequest(BaseModel):
     """Payload to create a new user account."""
@@ -37,6 +38,7 @@ class RefreshRequest(BaseModel):
 
 
 # ── Response schemas ────────────────────────────────────────────
+
 
 class TokenResponse(BaseModel):
     """Returned on login and refresh."""

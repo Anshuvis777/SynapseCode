@@ -9,13 +9,13 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.mixins import TimestampMixin, UUIDMixin
 from app.storage.database import Base
-from app.models.mixins import UUIDMixin, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.repository import Repository
     from app.models.message import Message
+    from app.models.repository import Repository
+    from app.models.user import User
 
 
 class Session(UUIDMixin, TimestampMixin, Base):
@@ -43,15 +43,11 @@ class Session(UUIDMixin, TimestampMixin, Base):
     )
 
     # ── Session identity ────────────────────────────────────────
-    title: Mapped[str] = mapped_column(
-        String(500), nullable=False, default="New Chat"
-    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="New Chat")
 
     # ── Relationships ───────────────────────────────────────────
     user: Mapped["User"] = relationship("User", back_populates="sessions")
-    repository: Mapped["Repository | None"] = relationship(
-        "Repository", back_populates="sessions"
-    )
+    repository: Mapped["Repository | None"] = relationship("Repository", back_populates="sessions")
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="session",
