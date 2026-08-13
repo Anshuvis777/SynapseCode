@@ -20,8 +20,8 @@ from app.storage.database import Base
 # Alembic Config object
 config = context.config
 
-# Override sqlalchemy.url from our Pydantic settings
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+# Override sqlalchemy.url from our Pydantic settings (escaping % for configparser)
+config.set_main_option("sqlalchemy.url", settings.database_url_sync.replace("%", "%%"))
 
 # Logging setup from alembic.ini safely handled
 if config.config_file_name is not None:
