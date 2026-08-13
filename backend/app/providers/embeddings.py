@@ -136,9 +136,13 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
     def __init__(self) -> None:
         self._model_name = "BAAI/bge-small-en-v1.5"
         self._dims = settings.embedding_dimensions
-        # TextEmbedding is loaded synchronously inside the constructor
-        # Limit threads to 1 to prevent memory exhaustion / OOM killer on low-resource machines
-        self._model = TextEmbedding(model_name=self._model_name, threads=1)
+        self._model = None
+
+    def _get_model(self) -> TextEmbedding:
+        if self._model is None:
+            logger.info(f"Loading FastEmbed model '{self._model_name}' into memory...")
+            self._model = TextEmbedding(model_name=self._model_name, threads=1)
+        return self._model
 
     @property
     def dimensions(self) -> int:
@@ -161,7 +165,8 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
 
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
         # FastEmbed.embed returns a generator of numpy arrays with batch processing
-        generator = self._model.embed(texts, batch_size=32)
+        model = self._get_model()
+        generator = model.embed(texts, batch_size=32)
         return [list(vector) for vector in generator]
 
     async def health_check(self) -> bool:
