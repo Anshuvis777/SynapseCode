@@ -47,7 +47,7 @@ export const Chat: React.FC = () => {
     }
   }, [activeSessionId, activeSession?.repositoryId]);
 
-  const hasApiKey = !!user?.geminiApiKey;
+  const hasApiKey = !!(user?.geminiApiKey || (user as any)?.huggingfaceApiKey);
 
   const handleContextChange = async (repoId: string | null) => {
     setActiveRepository(repoId);

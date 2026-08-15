@@ -20,11 +20,13 @@ apiClient.interceptors.request.use(
         if (user.token) {
           config.headers.Authorization = `Bearer ${user.token}`;
         }
+        // Support both new 'geminiApiKey' and old 'huggingfaceApiKey' localStorage key names
+        const geminiKey = user.geminiApiKey || user.huggingfaceApiKey;
         // If user provided a Gemini key — use Gemini for both LLM and embeddings
-        if (user.geminiApiKey) {
-          config.headers['X-Embedding-API-Key'] = user.geminiApiKey;
+        if (geminiKey) {
+          config.headers['X-Embedding-API-Key'] = geminiKey;
           config.headers['X-LLM-Provider'] = 'gemini';
-          config.headers['X-LLM-API-Key'] = user.geminiApiKey;
+          config.headers['X-LLM-API-Key'] = geminiKey;
         }
       } catch (e) {
         console.error('Error parsing stored user for auth token', e);
