@@ -103,10 +103,18 @@ def create_app() -> FastAPI:
 
     class DynamicCORSMiddleware(CORSMiddleware):
         """Custom CORS middleware to allow dynamic Vercel preview domains."""
+        def __init__(self, *args, **kwargs) -> None:
+            allow_origins = kwargs.get("allow_origins", [])
+            self.allow_all_origins_dynamic = False
+            if "*" in allow_origins:
+                self.allow_all_origins_dynamic = True
+                kwargs["allow_origins"] = [o for o in allow_origins if o != "*"]
+            super().__init__(*args, **kwargs)
+
         def is_allowed_origin(self, origin: str) -> bool:
-            if origin in self.allow_origins:
+            if self.allow_all_origins_dynamic:
                 return True
-            if "*" in self.allow_origins:
+            if origin in self.allow_origins:
                 return True
             # Allow any Vercel dynamic preview or production subdomains
             if origin.endswith(".vercel.app"):

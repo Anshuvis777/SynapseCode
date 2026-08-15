@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+# Ensure storage directories exist (critical when persistent volumes are mounted)
+echo "Creating storage directories..."
+mkdir -p /app/storage/repos /app/storage/documents
+
 # 1. Run database migrations
 echo "Running database migrations..."
 alembic upgrade head

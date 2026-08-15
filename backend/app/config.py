@@ -103,11 +103,11 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=384)  # BAAI/bge-small-en-v1.5
 
     # ── Indexing ────────────────────────────────────────────────
-    max_repo_size_mb: int = Field(default=500)
+    max_repo_size_mb: int = Field(default=50)
     max_file_size_kb: int = Field(default=1024)
     chunk_size_tokens: int = Field(default=512)  # smaller = more chunks, less context
     chunk_overlap_tokens: int = Field(default=64)
-    embedding_batch_size: int = Field(default=50)
+    embedding_batch_size: int = Field(default=25)
 
     # ── Storage (local disk — free) ─────────────────────────────
     repo_storage_path: str = Field(default="/app/storage/repos")
