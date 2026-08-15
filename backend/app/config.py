@@ -112,6 +112,7 @@ class Settings(BaseSettings):
     # ── Storage (local disk — free) ─────────────────────────────
     repo_storage_path: str = Field(default="/app/storage/repos")
     document_storage_path: str = Field(default="/app/storage/documents")
+    fastembed_cache_path: str = Field(default="/app/storage/cache")
 
     # ── Properties ──────────────────────────────────────────────
 

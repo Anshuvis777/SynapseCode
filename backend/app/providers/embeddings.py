@@ -141,7 +141,11 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
     def _get_model(self) -> TextEmbedding:
         if self._model is None:
             logger.info(f"Loading FastEmbed model '{self._model_name}' into memory...")
-            self._model = TextEmbedding(model_name=self._model_name, threads=1)
+            self._model = TextEmbedding(
+                model_name=self._model_name,
+                cache_dir=settings.fastembed_cache_path,
+                threads=1,
+            )
         return self._model
 
     @property
