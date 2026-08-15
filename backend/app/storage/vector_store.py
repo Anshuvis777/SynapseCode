@@ -228,11 +228,10 @@ class QdrantVectorStore:
             ),
         ]
         
-        query_filter = rest_models.Filter(
-            must=must_filters,
-            should=should_filters,
-            min_should_match=1,
-        )
+        # Nest the OR (should) filters inside the must list to guarantee at least one matches
+        must_filters.append(rest_models.Filter(should=should_filters))
+
+        query_filter = rest_models.Filter(must=must_filters)
 
         response = await self.client.query_points(
             collection_name=self.collection_chunks,
