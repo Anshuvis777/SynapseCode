@@ -245,14 +245,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const storedUser = localStorage.getItem('devassist_user');
       let token = '';
-      let provider = '';
-      let apiKey = '';
+      let geminiKey = '';
       if (storedUser) {
         try {
           const parsed = JSON.parse(storedUser);
           token = parsed.token || '';
-          provider = parsed.llmProvider || '';
-          apiKey = parsed.llmProvider === 'openai' ? parsed.openaiApiKey : parsed.groqApiKey;
+          geminiKey = parsed.geminiApiKey || parsed.huggingfaceApiKey || '';
         } catch {}
       }
 
@@ -261,11 +259,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       };
-      if (provider) {
-        headers['X-LLM-Provider'] = provider;
-      }
-      if (apiKey) {
-        headers['X-LLM-API-Key'] = apiKey;
+      if (geminiKey) {
+        headers['X-LLM-Provider'] = 'gemini';
+        headers['X-LLM-API-Key'] = geminiKey;
+        headers['X-Embedding-API-Key'] = geminiKey;
       }
 
       const response = await fetch(`${baseURL}/chat/sessions/${sessionId}/messages`, {
