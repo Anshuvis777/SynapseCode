@@ -103,8 +103,9 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     Optional — use Ollama embeddings to stay free.
     """
 
-    def __init__(self) -> None:
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+    def __init__(self, api_key: str | None = None) -> None:
+        key = api_key or settings.openai_api_key
+        self._client = AsyncOpenAI(api_key=key)
         self._model = settings.openai_embedding_model
         self._dims = settings.openai_embedding_dimensions
 

@@ -188,10 +188,10 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
     Bypasses local memory constraints by executing inference in the cloud.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, api_key: str | None = None) -> None:
         self._model = settings.huggingface_embedding_model
         self._dims = settings.embedding_dimensions
-        self._api_key = settings.huggingface_api_key
+        self._api_key = api_key or settings.huggingface_api_key
         self._client = httpx.AsyncClient(
             base_url="https://api-inference.huggingface.co",
             headers={

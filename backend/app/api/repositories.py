@@ -82,7 +82,7 @@ async def create_repository(
     await db.flush()
 
     # Trigger background Celery indexing task
-    index_repository_task.delay(str(repo.id), str(current_user.id))
+    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=payload.embedding_api_key)
 
     logger.info("repository_created", repo_id=str(repo.id), repo_name=repo.name)
     return repo

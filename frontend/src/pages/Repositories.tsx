@@ -25,6 +25,7 @@ export const Repositories: React.FC = () => {
 
   // Form states
   const [repoUrl, setRepoUrl] = useState('');
+  const [hfToken, setHfToken] = useState('');
   const [isLinking, setIsLinking] = useState(false);
 
   const handleLinkRepository = async (e: React.FormEvent) => {
@@ -38,8 +39,9 @@ export const Repositories: React.FC = () => {
     });
 
     try {
-      await connectGithubRepo(repoUrl.trim());
+      await connectGithubRepo(repoUrl.trim(), hfToken.trim() || undefined);
       setRepoUrl('');
+      setHfToken('');
       toast('Repository Connected', {
         description: `Successfully initiated background index`,
         type: 'success',
@@ -157,6 +159,23 @@ export const Repositories: React.FC = () => {
                   />
                   <span className="text-[9.5px] text-zinc-500 block">
                     Supports GitHub, GitLab, or any public Git repository link.
+                  </span>
+                </div>
+
+                {/* Hugging Face Token input */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    Hugging Face Access Token (Optional)
+                  </label>
+                  <input
+                    type="password"
+                    value={hfToken}
+                    onChange={(e) => setHfToken(e.target.value)}
+                    className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
+                    placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <span className="text-[9.5px] text-zinc-500 block leading-normal">
+                    Used only in-memory to execute cloud embeddings during indexing. Will never be saved in our database.
                   </span>
                 </div>
 

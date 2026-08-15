@@ -15,7 +15,7 @@ interface RepositoryState {
   fetchDocuments: () => Promise<void>;
 
   // Repo Actions
-  connectGithubRepo: (url: string) => Promise<void>;
+  connectGithubRepo: (url: string, hfToken?: string) => Promise<void>;
   uploadLocalRepo: (name: string, size: string, language: string) => Promise<void>;
   deleteRepo: (id: string) => Promise<void>;
   reindexRepo: (id: string) => Promise<void>;
@@ -109,7 +109,7 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
     }
   },
 
-  connectGithubRepo: async (url) => {
+  connectGithubRepo: async (url, hfToken) => {
     let owner = 'owner';
     let name = 'repo';
     try {
@@ -153,6 +153,7 @@ export const useRepositoryStore = create<RepositoryState>((set, get) => ({
         url,
         source_type: 'github',
         description: `GitHub repository ${owner}/${name}`,
+        embedding_api_key: hfToken || undefined,
       });
       
       const created = response.data;

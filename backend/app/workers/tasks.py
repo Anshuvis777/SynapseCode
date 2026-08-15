@@ -48,7 +48,7 @@ def _run_async(coro_factory: Callable[[], Awaitable[_T]]) -> _T:
     return _get_worker_loop().run_until_complete(coro_factory())
 
 
-async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID, embedding_api_key: str | None = None) -> bool:
     """Async implementation of the repository indexing pipeline."""
     async with AsyncSessionLocal() as db:
         # 1. Fetch Repository metadata
@@ -103,7 +103,7 @@ async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID) -> boo
             texts = [c["content"] for c in chunks]
 
             # Warm up and call embedding provider
-            embed_provider = get_embedding_provider()
+            embed_provider = get_embedding_provider(api_key=embedding_api_key)
 
             # Embed all chunks sequentially (handles internally in Ollama)
             logger.info(f"Generating embeddings for {len(chunks)} chunks of {repo.name}...")
@@ -155,7 +155,7 @@ async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID) -> boo
 
 
 @celery_app.task(name="app.workers.tasks.index_repository_task", bind=True, max_retries=3)
-def index_repository_task(self, repo_id_str: str, user_id_str: str) -> bool:
+def index_repository_task(self, repo_id_str: str, user_id_str: str, embedding_api_key: str | None = None) -> bool:
     """
     Celery background worker entry point.
     Runs the async pipeline inside an asyncio event loop.
@@ -164,7 +164,7 @@ def index_repository_task(self, repo_id_str: str, user_id_str: str) -> bool:
     user_id = uuid.UUID(user_id_str)
 
     # Run async pipeline on the worker's persistent event loop
-    return _run_async(lambda: _async_index_repository(repo_id, user_id))
+    return _run_async(lambda: _async_index_repository(repo_id, user_id, embedding_api_key=embedding_api_key))
 
 
 async def _async_process_document(doc_id: uuid.UUID) -> bool:

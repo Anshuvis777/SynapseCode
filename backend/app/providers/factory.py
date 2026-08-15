@@ -87,21 +87,13 @@ def get_llm_provider(provider: str | None = None, api_key: str | None = None) ->
     return _get_cached_llm_provider()
 
 
-@lru_cache(maxsize=1)
-def get_embedding_provider() -> EmbeddingProvider:
-    """
-    Return the configured Embedding provider singleton.
+def _create_embedding_provider(provider: str | None = None, api_key: str | None = None) -> EmbeddingProvider:
+    provider_name = (provider or settings.embedding_provider).lower()
 
-    Provider is selected based on EMBEDDING_PROVIDER env var:
-      - "fastembed" → FastEmbedEmbeddingProvider (local, FREE, low-RAM — default)
-      - "ollama"    → OllamaEmbeddingProvider    (local, FREE, needs separate server)
-      - "openai"    → OpenAIEmbeddingProvider    (paid, optional)
-    """
-    provider = settings.embedding_provider.lower()
-
-    if provider == "openai":
-        if not settings.openai_api_key:
-            raise ValueError("EMBEDDING_PROVIDER=openai but OPENAI_API_KEY is not set.")
+    if provider_name == "openai":
+        key = api_key or settings.openai_api_key
+        if not key:
+            raise ValueError("EMBEDDING_PROVIDER=openai but OPENAI_API_KEY / custom key is not set.")
         from app.providers.openai import OpenAIEmbeddingProvider
 
         logger.info(
@@ -109,9 +101,9 @@ def get_embedding_provider() -> EmbeddingProvider:
             provider="openai",
             model=settings.openai_embedding_model,
         )
-        return OpenAIEmbeddingProvider()
+        return OpenAIEmbeddingProvider(api_key=key)
 
-    elif provider == "ollama":
+    elif provider_name == "ollama":
         from app.providers.embeddings import OllamaEmbeddingProvider
 
         logger.info(
@@ -121,9 +113,10 @@ def get_embedding_provider() -> EmbeddingProvider:
         )
         return OllamaEmbeddingProvider()
 
-    elif provider == "huggingface":
-        if not settings.huggingface_api_key:
-            raise ValueError("EMBEDDING_PROVIDER=huggingface but HUGGINGFACE_API_KEY is not set.")
+    elif provider_name == "huggingface":
+        key = api_key or settings.huggingface_api_key
+        if not key:
+            raise ValueError("EMBEDDING_PROVIDER=huggingface but HUGGINGFACE_API_KEY / custom key is not set.")
         from app.providers.embeddings import HuggingFaceEmbeddingProvider
 
         logger.info(
@@ -131,7 +124,7 @@ def get_embedding_provider() -> EmbeddingProvider:
             provider="huggingface",
             model=settings.huggingface_embedding_model,
         )
-        return HuggingFaceEmbeddingProvider()
+        return HuggingFaceEmbeddingProvider(api_key=key)
 
     else:
         from app.providers.embeddings import FastEmbedEmbeddingProvider
@@ -144,7 +137,23 @@ def get_embedding_provider() -> EmbeddingProvider:
         return FastEmbedEmbeddingProvider()
 
 
+@lru_cache(maxsize=1)
+def _get_cached_embedding_provider() -> EmbeddingProvider:
+    return _create_embedding_provider()
+
+
+def get_embedding_provider(provider: str | None = None, api_key: str | None = None) -> EmbeddingProvider:
+    """
+    Return the configured Embedding provider.
+    If a custom provider or api_key is supplied, return a new provider instance.
+    Otherwise, return the cached default provider singleton.
+    """
+    if provider or api_key:
+        return _create_embedding_provider(provider=provider, api_key=api_key)
+    return _get_cached_embedding_provider()
+
+
 def clear_provider_cache() -> None:
     """Clear cached providers — used in tests to reset state."""
     _get_cached_llm_provider.cache_clear()
-    get_embedding_provider.cache_clear()
+    _get_cached_embedding_provider.cache_clear()
