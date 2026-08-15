@@ -72,8 +72,8 @@ export const Repositories: React.FC = () => {
     }
   };
 
-  const getStatusPill = (status: string) => {
-    switch (status) {
+  const getStatusPill = (repo: any) => {
+    switch (repo.status) {
       case 'indexed':
         return (
           <span className="inline-flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-950/30 border border-emerald-900/30 px-2 py-0.5 rounded-full">
@@ -81,9 +81,16 @@ export const Repositories: React.FC = () => {
           </span>
         );
       case 'indexing':
+        let label = 'Syncing';
+        if (repo.rawStatus === 'cloning') label = 'Cloning';
+        else if (repo.rawStatus === 'parsing') label = 'Parsing';
+        else if (repo.rawStatus === 'embedding') label = 'Embedding';
+        else if (repo.rawStatus === 'indexing') label = 'Indexing';
+        else if (repo.rawStatus === 'pending') label = 'Pending';
+
         return (
           <span className="inline-flex items-center text-[10px] font-bold text-amber-400 bg-amber-950/30 border border-amber-900/30 px-2 py-0.5 rounded-full animate-pulse">
-            Syncing
+            {label}
           </span>
         );
       case 'failed':
@@ -250,22 +257,47 @@ export const Repositories: React.FC = () => {
                       <span>{repo.lastIndexedTime || 'Never'}</span>
                     </span>
                     <div className="flex-grow flex justify-end">
-                      {getStatusPill(repo.status)}
+                      {getStatusPill(repo)}
                     </div>
                   </div>
 
                   {/* Indexing Progress Indicator */}
                   {repo.status === 'indexing' && (
-                    <div className="space-y-1 mt-1">
-                      <div className="flex justify-between text-[9px] font-bold text-amber-500">
-                        <span>Syncing code chunks...</span>
-                        <span>{repo.progress || 10}%</span>
+                    <div className="space-y-2 mt-2 bg-[#0d0d11] p-2.5 rounded-lg border border-zinc-850">
+                      {/* Step Labels */}
+                      <div className="grid grid-cols-4 gap-1 text-[8.5px] font-bold text-center tracking-wider select-none">
+                        <span className={repo.rawStatus === 'cloning' ? 'text-amber-500 animate-pulse' : repo.progress && repo.progress > 10 ? 'text-emerald-500' : 'text-zinc-650'}>
+                          1. CLONING
+                        </span>
+                        <span className={repo.rawStatus === 'parsing' ? 'text-amber-500 animate-pulse' : repo.progress && repo.progress > 40 ? 'text-emerald-500' : 'text-zinc-655'}>
+                          2. PARSING
+                        </span>
+                        <span className={repo.rawStatus === 'embedding' ? 'text-amber-500 animate-pulse' : repo.progress && repo.progress > 60 ? 'text-emerald-500' : 'text-zinc-655'}>
+                          3. EMBEDDING
+                        </span>
+                        <span className={repo.rawStatus === 'indexing' ? 'text-amber-500 animate-pulse' : repo.progress && repo.progress > 85 ? 'text-emerald-500' : 'text-zinc-655'}>
+                          4. INDEXING
+                        </span>
                       </div>
-                      <div className="h-1 bg-zinc-950 border border-zinc-850 rounded-full overflow-hidden">
+                      
+                      {/* Progress Bar */}
+                      <div className="h-1 bg-zinc-950 rounded-full overflow-hidden">
                         <div 
-                          className="bg-amber-500 h-full transition-all duration-300"
+                          className="bg-amber-500 h-full transition-all duration-500"
                           style={{ width: `${repo.progress || 10}%` }}
                         />
+                      </div>
+
+                      {/* Dynamic Detail Text */}
+                      <div className="flex justify-between text-[9px] font-bold text-zinc-400">
+                        <span>
+                          {repo.rawStatus === 'cloning' && 'Downloading repository files...'}
+                          {repo.rawStatus === 'parsing' && 'Scanning codebase files and building AST...'}
+                          {repo.rawStatus === 'embedding' && 'Generating vector embeddings...'}
+                          {repo.rawStatus === 'indexing' && 'Upserting points to Qdrant vector cloud...'}
+                          {repo.rawStatus === 'pending' && 'Waiting in worker queue...'}
+                        </span>
+                        <span className="font-mono text-zinc-500">{repo.progress || 10}%</span>
                       </div>
                     </div>
                   )}
