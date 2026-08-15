@@ -180,3 +180,91 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
     async def aclose(self) -> None:
         """No HTTP client or persistent connections to close."""
         pass
+
+
+class HuggingFaceEmbeddingProvider(EmbeddingProvider):
+    """
+    Embedding provider using Hugging Face's Serverless Inference API.
+    Bypasses local memory constraints by executing inference in the cloud.
+    """
+
+    def __init__(self) -> None:
+        self._model = settings.huggingface_embedding_model
+        self._dims = settings.embedding_dimensions
+        self._api_key = settings.huggingface_api_key
+        self._client = httpx.AsyncClient(
+            base_url="https://api-inference.huggingface.co",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=30.0,
+        )
+
+    @property
+    def dimensions(self) -> int:
+        return self._dims
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Embed a single text string."""
+        text = text.strip()
+        if not text:
+            return [0.0] * self._dims
+
+        embeddings = await self.embed_batch([text])
+        return embeddings[0]
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Embed a batch of texts remotely via HF Inference API."""
+        cleaned = [t.strip() for t in texts]
+        if not cleaned:
+            return []
+
+        response = await self._client.post(
+            f"/models/{self._model}",
+            json={"inputs": cleaned, "options": {"wait_for_model": True}},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if not isinstance(data, list):
+            logger.error("huggingface_embed_response_invalid", type=str(type(data)), content=str(data))
+            raise ValueError(f"Invalid response from Hugging Face Inference API: {data}")
+
+        parsed_embeddings = []
+        for item in data:
+            if isinstance(item, list) and len(item) > 0:
+                if isinstance(item[0], list):
+                    # 3D hidden states (e.g. token level) -> take CLS representation (index 0)
+                    parsed_embeddings.append([float(val) for val in item[0]])
+                else:
+                    # 2D pooled sentence representation
+                    parsed_embeddings.append([float(val) for val in item])
+            else:
+                logger.warning("huggingface_embed_item_invalid", item=str(item))
+                parsed_embeddings.append([0.0] * self._dims)
+
+        logger.info(
+            "huggingface_embed_batch_complete",
+            total=len(texts),
+            model=self._model,
+        )
+        return parsed_embeddings
+
+    async def health_check(self) -> bool:
+        """Verify the Hugging Face API key and model availability."""
+        try:
+            response = await self._client.post(
+                f"/models/{self._model}",
+                json={"inputs": "test", "options": {"wait_for_model": True}},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.warning("huggingface_health_check_failed", error=str(e))
+            return False
+
+    async def aclose(self) -> None:
+        """Close the HTTP client."""
+        await self._client.aclose()

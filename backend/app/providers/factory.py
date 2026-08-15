@@ -121,6 +121,18 @@ def get_embedding_provider() -> EmbeddingProvider:
         )
         return OllamaEmbeddingProvider()
 
+    elif provider == "huggingface":
+        if not settings.huggingface_api_key:
+            raise ValueError("EMBEDDING_PROVIDER=huggingface but HUGGINGFACE_API_KEY is not set.")
+        from app.providers.embeddings import HuggingFaceEmbeddingProvider
+
+        logger.info(
+            "embedding_provider_selected",
+            provider="huggingface",
+            model=settings.huggingface_embedding_model,
+        )
+        return HuggingFaceEmbeddingProvider()
+
     else:
         from app.providers.embeddings import FastEmbedEmbeddingProvider
 
