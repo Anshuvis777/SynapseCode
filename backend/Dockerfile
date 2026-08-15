@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Create storage directories
 RUN mkdir -p /app/storage/repos /app/storage/documents
 
+# Pre-download FastEmbed model weights to bake them into the image
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/app/storage/cache')"
+
 EXPOSE 8000
 
 CMD ["/app/start.sh"]
