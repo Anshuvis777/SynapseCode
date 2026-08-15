@@ -20,7 +20,7 @@ export const Chat: React.FC = () => {
     sendMessage 
   } = useChatStore();
 
-  const { repositories, activeRepositoryId, setActiveRepository } = useRepositoryStore();
+  const { repositories, activeRepositoryId, setActiveRepository, documents } = useRepositoryStore();
   const { user } = useUserStore();
 
   const [input, setInput] = useState('');
@@ -49,10 +49,10 @@ export const Chat: React.FC = () => {
 
   const hasApiKey = !!(user?.geminiApiKey || (user as any)?.huggingfaceApiKey);
 
-  const handleContextChange = async (repoId: string | null) => {
+  const handleContextChange = async (repoId: string | null, docId: string | null = null) => {
     setActiveRepository(repoId);
     if (activeSessionId) {
-      await updateSessionRepository(activeSessionId, repoId);
+      await updateSessionRepository(activeSessionId, repoId, docId);
     }
   };
 
@@ -257,16 +257,38 @@ export const Chat: React.FC = () => {
                   </div>
 
                   <select
-                    value={activeSession?.repositoryId || ''}
-                    onChange={(e) => handleContextChange(e.target.value || null)}
+                    value={activeSession?.repositoryId ? `repo:${activeSession.repositoryId}` : activeSession?.documentId ? `doc:${activeSession.documentId}` : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        handleContextChange(null, null);
+                      } else if (val.startsWith('repo:')) {
+                        handleContextChange(val.slice(5), null);
+                      } else if (val.startsWith('doc:')) {
+                        handleContextChange(null, val.slice(4));
+                      }
+                    }}
                     className="bg-[#060608] border border-[#1c1c21] text-[11px] rounded px-2.5 py-1 text-zinc-300 focus:outline-none focus:border-blue-500"
                   >
-                    <option value="">No Active Repository</option>
-                    {repositories.map((repo) => (
-                      <option key={repo.id} value={repo.id}>
-                        {repo.name} ({repo.language})
-                      </option>
-                    ))}
+                    <option value="">No Active Context</option>
+                    {repositories.length > 0 && (
+                      <optgroup label="Code Repositories">
+                        {repositories.map((repo) => (
+                          <option key={repo.id} value={`repo:${repo.id}`}>
+                            📁 {repo.name} ({repo.language})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {documents.length > 0 && (
+                      <optgroup label="Uploaded Documents">
+                        {documents.map((doc) => (
+                          <option key={doc.id} value={`doc:${doc.id}`}>
+                            📄 {doc.name} ({doc.type.toUpperCase()})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
 

@@ -74,6 +74,11 @@ class QdrantVectorStore:
                             field_name="repository_id",
                             field_schema=rest_models.PayloadSchemaType.KEYWORD,
                         )
+                        await self.client.create_payload_index(
+                            collection_name=collection_name,
+                            field_name="document_id",
+                            field_schema=rest_models.PayloadSchemaType.KEYWORD,
+                        )
                     elif collection_name == self.collection_memories:
                         await self.client.create_payload_index(
                             collection_name=collection_name,
@@ -94,10 +99,11 @@ class QdrantVectorStore:
         repository_id: uuid.UUID | None,
         chunks: list[dict[str, Any]],
         embeddings: list[list[float]],
+        document_id: uuid.UUID | None = None,
     ) -> None:
         """
         Upsert a batch of code chunks with their vector embeddings into Qdrant.
-        Ensures user_id and repository_id are injected in the payload for isolation.
+        Ensures user_id, repository_id, and document_id are injected in the payload for isolation.
 
         chunks list item structure:
         {
@@ -119,6 +125,7 @@ class QdrantVectorStore:
             payload = {
                 "user_id": str(user_id),
                 "repository_id": str(repository_id) if repository_id is not None else None,
+                "document_id": str(document_id) if document_id is not None else None,
                 "file_path": chunk["file_path"],
                 "content": chunk["content"],
                 "start_line": chunk["start_line"],
@@ -169,6 +176,63 @@ class QdrantVectorStore:
         ]
 
         query_filter = rest_models.Filter(must=must_filters)
+
+        response = await self.client.query_points(
+            collection_name=self.collection_chunks,
+            query=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+        )
+
+        return [
+            {
+                "id": r.id,
+                "score": r.score,
+                "file_path": r.payload.get("file_path"),  # type: ignore
+                "content": r.payload.get("content"),  # type: ignore
+                "start_line": r.payload.get("start_line"),  # type: ignore
+                "end_line": r.payload.get("end_line"),  # type: ignore
+                "language": r.payload.get("language"),  # type: ignore
+            }
+            for r in response.points
+        ]
+
+    async def search_document_chunks(
+        self,
+        user_id: uuid.UUID,
+        document_id: uuid.UUID,
+        document_filename: str,
+        query_vector: list[float],
+        limit: int = 8,
+    ) -> list[dict[str, Any]]:
+        """
+        Perform a semantic vector search scoped strictly to the current user
+        and strictly scoped to the specified document.
+        """
+        must_filters = [
+            rest_models.FieldCondition(
+                key="user_id",
+                match=rest_models.MatchValue(value=str(user_id)),
+            )
+        ]
+        
+        # Support searching by document_id OR filename for backward compatibility
+        should_filters = [
+            rest_models.FieldCondition(
+                key="document_id",
+                match=rest_models.MatchValue(value=str(document_id)),
+            ),
+            rest_models.FieldCondition(
+                key="file_path",
+                match=rest_models.MatchValue(value=document_filename),
+            ),
+        ]
+        
+        query_filter = rest_models.Filter(
+            must=must_filters,
+            should=should_filters,
+            min_should_match=1,
+        )
 
         response = await self.client.query_points(
             collection_name=self.collection_chunks,

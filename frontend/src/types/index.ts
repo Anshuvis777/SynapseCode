@@ -46,6 +46,7 @@ export interface ChatSession {
   updatedAt: string;
   messages: Message[];
   repositoryId?: string;
+  documentId?: string;
 }
 
 export type RepositoryStatus = 'indexed' | 'indexing' | 'failed' | 'not_indexed';

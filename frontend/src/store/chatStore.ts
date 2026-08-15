@@ -14,9 +14,9 @@ interface ChatState {
   fetchMemories: () => Promise<void>;
   
   // Chat Actions
-  createSession: (repositoryId?: string, title?: string) => Promise<string>;
+  createSession: (repositoryId?: string, title?: string, documentId?: string) => Promise<string>;
   selectSession: (id: string | null) => Promise<void>;
-  updateSessionRepository: (sessionId: string, repositoryId: string | null) => Promise<void>;
+  updateSessionRepository: (sessionId: string, repositoryId: string | null, documentId?: string | null) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   sendMessage: (content: string, repositoryId?: string) => Promise<void>;
   
@@ -45,6 +45,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: s.id,
         title: s.title,
         repositoryId: s.repository_id,
+        documentId: s.document_id,
         createdAt: new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         updatedAt: new Date(s.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         messages: [],
@@ -76,10 +77,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  createSession: async (repositoryId, title = 'New Conversation') => {
+  createSession: async (repositoryId, title = 'New Conversation', documentId) => {
     try {
       const response = await apiClient.post('/chat/sessions', {
         repository_id: repositoryId,
+        document_id: documentId,
         title,
       });
       const s = response.data;
@@ -87,6 +89,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         id: s.id,
         title: s.title,
         repositoryId: s.repository_id,
+        documentId: s.document_id,
         createdAt: new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         updatedAt: new Date(s.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         messages: [],
@@ -141,7 +144,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       set((state) => ({
         sessions: state.sessions.map((s) =>
-          s.id === id ? { ...s, repositoryId: sessionData.repository_id || undefined, messages } : s
+          s.id === id ? { ...s, repositoryId: sessionData.repository_id || undefined, documentId: sessionData.document_id || undefined, messages } : s
         ),
       }));
     } catch (e) {
@@ -149,18 +152,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  updateSessionRepository: async (sessionId: string, repositoryId: string | null) => {
+  updateSessionRepository: async (sessionId: string, repositoryId: string | null, documentId: string | null = null) => {
     try {
       await apiClient.patch(`/chat/sessions/${sessionId}`, {
         repository_id: repositoryId,
+        document_id: documentId,
       });
       set((state) => ({
         sessions: state.sessions.map((s) =>
-          s.id === sessionId ? { ...s, repositoryId: repositoryId || undefined } : s
+          s.id === sessionId ? { ...s, repositoryId: repositoryId || undefined, documentId: documentId || undefined } : s
         ),
       }));
     } catch (e) {
-      console.error('Failed to update session repository context', e);
+      console.error('Failed to update session context', e);
     }
   },
 

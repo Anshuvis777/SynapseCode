@@ -13,6 +13,7 @@ from app.models.mixins import TimestampMixin, UUIDMixin
 from app.storage.database import Base
 
 if TYPE_CHECKING:
+    from app.models.document import Document
     from app.models.message import Message
     from app.models.repository import Repository
     from app.models.user import User
@@ -42,12 +43,21 @@ class Session(UUIDMixin, TimestampMixin, Base):
         index=True,
     )
 
+    # ── Document scope (optional) ───────────────────────────────
+    doc_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # ── Session identity ────────────────────────────────────────
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="New Chat")
 
     # ── Relationships ───────────────────────────────────────────
     user: Mapped["User"] = relationship("User", back_populates="sessions")
     repository: Mapped["Repository | None"] = relationship("Repository", back_populates="sessions")
+    document: Mapped["Document | None"] = relationship("Document")
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="session",

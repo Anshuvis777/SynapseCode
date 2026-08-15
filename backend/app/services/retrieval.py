@@ -128,3 +128,33 @@ class RetrievalService:
             context_blocks.append(block)
 
         return "\n".join(context_blocks)
+
+    async def retrieve_document_context(
+        self,
+        user_id: uuid.UUID,
+        document_id: uuid.UUID,
+        document_filename: str,
+        query: str,
+        limit: int = 6,
+        embedding_api_key: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Embed the user query, search in Qdrant specifically for document chunks, and return chunks.
+        """
+        logger.info("retrieving_document_context", doc_id=str(document_id), filename=document_filename, query=query)
+
+        # 1. Embed query
+        provider = get_embedding_provider(api_key=embedding_api_key) if embedding_api_key else self.embedding_provider
+        query_vector = await provider.embed_text(query)
+
+        # 2. Query Qdrant with document filter
+        chunks = await self.vector_store.search_document_chunks(
+            user_id=user_id,
+            document_id=document_id,
+            document_filename=document_filename,
+            query_vector=query_vector,
+            limit=limit,
+        )
+
+        return chunks
+

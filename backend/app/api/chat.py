@@ -60,6 +60,7 @@ async def create_session(
         id=uuid.uuid4(),
         user_id=current_user.id,
         repo_id=payload.repository_id,
+        doc_id=payload.document_id,
         title=payload.title,
     )
     db.add(session)
@@ -75,15 +76,18 @@ async def create_session(
 )
 async def list_sessions(
     repository_id: uuid.UUID | None = None,
+    document_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Session]:
     """
-    Returns all chat sessions. Optionally filters by repository_id.
+    Returns all chat sessions. Optionally filters by repository_id or document_id.
     """
     query = select(Session).where(Session.user_id == current_user.id)
     if repository_id:
         query = query.where(Session.repo_id == repository_id)
+    if document_id:
+        query = query.where(Session.doc_id == document_id)
     query = query.order_by(Session.updated_at.desc())
 
     result = await db.execute(query)
@@ -120,6 +124,7 @@ async def get_session(
         "id": session.id,
         "title": session.title,
         "repository_id": session.repo_id,
+        "document_id": session.doc_id,
         "created_at": session.created_at,
         "messages": [MessageResponse.model_validate(m) for m in messages],
     }
@@ -172,12 +177,14 @@ async def update_session(
 
     if payload.repository_id is not None or "repository_id" in payload.model_fields_set:
         session.repo_id = payload.repository_id
+    if payload.document_id is not None or "document_id" in payload.model_fields_set:
+        session.doc_id = payload.document_id
     if payload.title is not None:
         session.title = payload.title
 
     await db.commit()
     await db.refresh(session)
-    logger.info("chat_session_updated", session_id=str(session_id), repo_id=str(session.repo_id))
+    logger.info("chat_session_updated", session_id=str(session_id), repo_id=str(session.repo_id), doc_id=str(session.doc_id))
     return session
 
 
@@ -226,7 +233,7 @@ async def send_message(
     db.add(user_msg)
     await db.flush()
 
-    # 3. Retrieve relevant repository code context ONLY if session has an attached repository
+    # 3. Retrieve relevant repository or document context ONLY if session has an attached repository/document
     chunks = []
     if session.repo_id is not None:
         chunks = await retrieval_service.retrieve_context(
@@ -235,6 +242,17 @@ async def send_message(
             query=payload.content,
             embedding_api_key=x_embedding_api_key,
         )
+    elif session.doc_id is not None:
+        from app.models.document import Document
+        doc = await db.get(Document, session.doc_id)
+        if doc:
+            chunks = await retrieval_service.retrieve_document_context(
+                user_id=current_user.id,
+                document_id=doc.id,
+                document_filename=doc.filename,
+                query=payload.content,
+                embedding_api_key=x_embedding_api_key,
+            )
     context_str = retrieval_service.format_context_prompt(chunks) if chunks else ""
 
     # 4. Fetch long-term developer memories from Qdrant
@@ -266,7 +284,7 @@ async def send_message(
     llm_messages = []
 
     # Inject system instruction with RAG context and developer memories
-    if session.repo_id is not None and context_str:
+    if (session.repo_id is not None or session.doc_id is not None) and context_str:
         system_instruction = (
             "You are CodexRAG, a staff software developer assistant.\n"
             "Your task is to answer user questions about the attached repository/document "

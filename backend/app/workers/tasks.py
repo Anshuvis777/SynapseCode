@@ -236,6 +236,7 @@ async def _async_process_document(doc_id: uuid.UUID, embedding_api_key: str | No
                 repository_id=doc.repo_id,
                 chunks=chunks,
                 embeddings=embeddings,
+                document_id=doc.id,
             )
 
             # 5. Mark ready
