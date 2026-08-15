@@ -153,7 +153,8 @@ async def ingest_url(
     """
     # 1. Fetch URL content using HTTPX
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+        async with httpx.AsyncClient(transport=transport, timeout=15.0) as client:
             response = await client.get(payload.url, follow_redirects=True)
             response.raise_for_status()
             html_content = response.text

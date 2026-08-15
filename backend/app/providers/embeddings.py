@@ -192,7 +192,9 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         self._model = settings.huggingface_embedding_model
         self._dims = settings.embedding_dimensions
         self._api_key = api_key or settings.huggingface_api_key
+        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
         self._client = httpx.AsyncClient(
+            transport=transport,
             base_url="https://api-inference.huggingface.co",
             headers={
                 "Authorization": f"Bearer {self._api_key}",
