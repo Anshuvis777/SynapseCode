@@ -47,9 +47,7 @@ export const Chat: React.FC = () => {
     }
   }, [activeSessionId, activeSession?.repositoryId]);
 
-  const activeProvider = user?.huggingfaceApiKey ? 'gemini' : (user?.llmProvider || 'groq');
-  const activeKey = user?.huggingfaceApiKey || (activeProvider === 'openai' ? user?.openaiApiKey : user?.groqApiKey);
-  const hasApiKey = !!activeKey;
+  const hasApiKey = !!user?.geminiApiKey;
 
   const handleContextChange = async (repoId: string | null) => {
     setActiveRepository(repoId);
@@ -278,7 +276,7 @@ export const Chat: React.FC = () => {
                     <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <div>
                       <span className="font-bold text-amber-300">LLM API Key Required (Zero-Retention Privacy): </span>
-                       For your privacy and security, API keys are <strong>never stored on the server</strong>. Please click your profile card in the bottom-left sidebar to provide your <strong>{activeProvider === 'gemini' ? 'Gemini' : activeProvider === 'openai' ? 'OpenAI' : 'Groq'} API Key</strong> for this session.
+                       For your privacy and security, API keys are <strong>never stored on the server</strong>. Please click your profile card in the bottom-left sidebar to add your <strong>Google AI Studio (Gemini) API Key</strong> for this session. Get a free key at <strong>aistudio.google.com</strong>.
                     </div>
                   </div>
                 )}

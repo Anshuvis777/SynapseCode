@@ -37,14 +37,11 @@ export const DashboardLayout: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profileEmail, setProfileEmail] = useState('');
-  const [profileProvider, setProfileProvider] = useState<'groq' | 'openai'>('groq');
-  const [profileGroqKey, setProfileGroqKey] = useState('');
-  const [profileOpenAIKey, setProfileOpenAIKey] = useState('');
-  const [profileHuggingFaceKey, setProfileHuggingFaceKey] = useState('');
+  const [profileGeminiKey, setProfileGeminiKey] = useState('');
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile(profileName, profileEmail, profileProvider, profileGroqKey, profileOpenAIKey, profileHuggingFaceKey);
+    updateProfile(profileName, profileEmail, profileGeminiKey);
     setIsProfileOpen(false);
   };
 
@@ -142,10 +139,7 @@ export const DashboardLayout: React.FC = () => {
                 onClick={() => {
                   setProfileName(user?.name || '');
                   setProfileEmail(user?.email || '');
-                  setProfileProvider(user?.llmProvider || 'groq');
-                  setProfileGroqKey(user?.groqApiKey || '');
-                  setProfileOpenAIKey(user?.openaiApiKey || '');
-                  setProfileHuggingFaceKey(user?.huggingfaceApiKey || '');
+                  setProfileGeminiKey(user?.geminiApiKey || '');
                   setIsProfileOpen(true);
                 }}
                 title="View/Edit Profile"
@@ -179,10 +173,7 @@ export const DashboardLayout: React.FC = () => {
                 onClick={() => {
                   setProfileName(user?.name || '');
                   setProfileEmail(user?.email || '');
-                  setProfileProvider(user?.llmProvider || 'groq');
-                  setProfileGroqKey(user?.groqApiKey || '');
-                  setProfileOpenAIKey(user?.openaiApiKey || '');
-                  setProfileHuggingFaceKey(user?.huggingfaceApiKey || '');
+                  setProfileGeminiKey(user?.geminiApiKey || '');
                   setIsProfileOpen(true);
                 }}
                 title="View/Edit Profile"
@@ -277,8 +268,8 @@ export const DashboardLayout: React.FC = () => {
                 <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Gemini API Key</label>
                 <input 
                   type="password"
-                  value={profileHuggingFaceKey}
-                  onChange={(e) => setProfileHuggingFaceKey(e.target.value)}
+                  value={profileGeminiKey}
+                  onChange={(e) => setProfileGeminiKey(e.target.value)}
                   className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
                   placeholder="AIzaSy... (Optional)"
                 />

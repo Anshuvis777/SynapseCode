@@ -209,11 +209,11 @@ async def send_message(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    # Verify custom LLM API key presence
+    # LLM key priority: user's per-session Gemini key (X-LLM-API-Key header) — required, no server fallback
     if not x_llm_api_key or not x_llm_api_key.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="LLM API key is required. Please set your API key in your profile settings.",
+            detail="Gemini API key is required. Please add your Google AI Studio API key in your Profile settings.",
         )
 
     # 2. Save user message to PostgreSQL

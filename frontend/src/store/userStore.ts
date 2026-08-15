@@ -10,7 +10,7 @@ interface UserState {
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => void;
   clearError: () => void;
-  updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string, huggingfaceApiKey?: string) => void;
+  updateProfile: (name: string, email: string, geminiApiKey?: string) => void;
   registerUser: (email: string, name: string, password?: string) => Promise<boolean>;
 }
 
@@ -86,18 +86,14 @@ export const useUserStore = create<UserState>((set, get) => {
       set({ user: null, isAuthenticated: false });
     },
 
-    updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string, huggingfaceApiKey?: string) => {
+    updateProfile: (name: string, email: string, geminiApiKey?: string) => {
       set((state) => {
         if (!state.user) return state;
         const updatedUser = {
           ...state.user,
           name,
           email,
-          llmProvider,
-          groqApiKey,
-          openaiApiKey,
-          huggingfaceApiKey,
-          apiKey: llmProvider === 'openai' ? openaiApiKey : groqApiKey,
+          geminiApiKey,
           avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(email)}`,
         };
         localStorage.setItem('devassist_user', JSON.stringify(updatedUser));

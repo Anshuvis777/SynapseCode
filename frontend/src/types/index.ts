@@ -4,11 +4,7 @@ export interface User {
   name: string;
   avatarUrl?: string;
   token?: string;
-  apiKey?: string;
-  llmProvider?: 'groq' | 'openai';
-  groqApiKey?: string;
-  openaiApiKey?: string;
-  huggingfaceApiKey?: string;
+  geminiApiKey?: string;
 }
 
 export type MessageRole = 'user' | 'assistant';

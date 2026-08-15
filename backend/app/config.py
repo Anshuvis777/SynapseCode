@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     qdrant_collection_chunks: str = Field(default="code_chunks")
     qdrant_collection_memories: str = Field(default="memories")
 
-    # Supported: "gemini" (free API) | "groq" (free API) | "ollama" (local) | "openai" (paid)
+    # Supported: "gemini" (free API) | "groq" (free API) | "openai" (paid)
     llm_provider: str = Field(default="gemini")
     gemini_llm_model: str = Field(default="gemini-2.5-flash")
 
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     # Ollama — FREE, LOCAL (for embeddings only — no GPU needed for small embed models)
     ollama_base_url: str = Field(default="http://ollama:11434")
     ollama_embedding_model: str = Field(default="nomic-embed-text")
-    embedding_provider: str = Field(default="gemini")  # "gemini" | "openai" (local providers disabled)
+    embedding_provider: str = Field(default="gemini")  # "gemini" (default) | "openai"
 
     # Gemini — FREE Serverless Inference API (get key at aistudio.google.com)
     gemini_api_key: str = Field(default="")

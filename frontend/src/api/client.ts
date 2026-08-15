@@ -20,18 +20,11 @@ apiClient.interceptors.request.use(
         if (user.token) {
           config.headers.Authorization = `Bearer ${user.token}`;
         }
-        if (user.huggingfaceApiKey) {
-          config.headers['X-Embedding-API-Key'] = user.huggingfaceApiKey;
+        // If user provided a Gemini key — use Gemini for both LLM and embeddings
+        if (user.geminiApiKey) {
+          config.headers['X-Embedding-API-Key'] = user.geminiApiKey;
           config.headers['X-LLM-Provider'] = 'gemini';
-          config.headers['X-LLM-API-Key'] = user.huggingfaceApiKey;
-        } else {
-          if (user.llmProvider) {
-            config.headers['X-LLM-Provider'] = user.llmProvider;
-          }
-          const activeKey = user.llmProvider === 'openai' ? user.openaiApiKey : user.groqApiKey;
-          if (activeKey) {
-            config.headers['X-LLM-API-Key'] = activeKey;
-          }
+          config.headers['X-LLM-API-Key'] = user.geminiApiKey;
         }
       } catch (e) {
         console.error('Error parsing stored user for auth token', e);
