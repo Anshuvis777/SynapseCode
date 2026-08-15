@@ -273,59 +273,17 @@ export const DashboardLayout: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Active LLM Provider</label>
-                <select 
-                  value={profileProvider}
-                  onChange={(e) => setProfileProvider(e.target.value as 'groq' | 'openai')}
-                  className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition cursor-pointer"
-                >
-                  <option value="groq">Groq (Default)</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </div>
-
-              {profileProvider === 'groq' ? (
-                <div className="space-y-1.5">
-                  <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Groq API Key</label>
-                  <input 
-                    type="password"
-                    value={profileGroqKey}
-                    onChange={(e) => setProfileGroqKey(e.target.value)}
-                    className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
-                    placeholder="gsk_... (Optional)"
-                  />
-                  <span className="text-[9px] text-zinc-500 block leading-normal">
-                    Provide your own Groq API key to override default server settings.
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">OpenAI API Key</label>
-                  <input 
-                    type="password"
-                    value={profileOpenAIKey}
-                    onChange={(e) => setProfileOpenAIKey(e.target.value)}
-                    className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
-                    placeholder="sk-... (Optional)"
-                  />
-                  <span className="text-[9px] text-zinc-500 block leading-normal">
-                    Provide your own OpenAI API key to override default server settings.
-                  </span>
-                </div>
-              )}
-
               <div className="space-y-1.5 border-t border-zinc-800/60 pt-3">
-                <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Hugging Face API Token</label>
+                <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Gemini API Key</label>
                 <input 
                   type="password"
                   value={profileHuggingFaceKey}
                   onChange={(e) => setProfileHuggingFaceKey(e.target.value)}
                   className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
-                  placeholder="hf_... (Optional)"
+                  placeholder="AIzaSy... (Optional)"
                 />
                 <span className="text-[9px] text-zinc-500 block leading-normal">
-                  Provide your own Hugging Face token to run free cloud embeddings when syncing codebases.
+                  Provide your own Gemini API key to run both free cloud embeddings and chat reasoning.
                 </span>
               </div>
 

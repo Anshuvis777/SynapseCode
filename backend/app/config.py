@@ -71,9 +71,9 @@ class Settings(BaseSettings):
     qdrant_collection_chunks: str = Field(default="code_chunks")
     qdrant_collection_memories: str = Field(default="memories")
 
-    # ── LLM Provider ────────────────────────────────────────────
-    # Supported: "groq" (free API) | "ollama" (local) | "openai" (paid)
-    llm_provider: str = Field(default="groq")
+    # Supported: "gemini" (free API) | "groq" (free API) | "ollama" (local) | "openai" (paid)
+    llm_provider: str = Field(default="gemini")
+    gemini_llm_model: str = Field(default="gemini-2.5-flash")
 
     # Groq — FREE API (get key at console.groq.com, no credit card)
     groq_api_key: str = Field(default="")
@@ -87,11 +87,11 @@ class Settings(BaseSettings):
     # Ollama — FREE, LOCAL (for embeddings only — no GPU needed for small embed models)
     ollama_base_url: str = Field(default="http://ollama:11434")
     ollama_embedding_model: str = Field(default="nomic-embed-text")
-    embedding_provider: str = Field(default="huggingface")  # "huggingface" | "openai" (local providers disabled)
+    embedding_provider: str = Field(default="gemini")  # "gemini" | "openai" (local providers disabled)
 
-    # Hugging Face — FREE Serverless Inference API (get token at huggingface.co/settings/tokens)
-    huggingface_api_key: str = Field(default="")
-    huggingface_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5")
+    # Gemini — FREE Serverless Inference API (get key at aistudio.google.com)
+    gemini_api_key: str = Field(default="")
+    gemini_embedding_model: str = Field(default="models/gemini-embedding-001")
 
     # OpenAI — OPTIONAL (paid, only if user provides key)
     openai_api_key: str = Field(default="")
@@ -132,17 +132,21 @@ class Settings(BaseSettings):
     def active_llm_model(self) -> str:
         """Return active LLM model name based on configured provider."""
         match self.llm_provider:
+            case "gemini":
+                return self.gemini_llm_model
             case "openai":
                 return self.openai_llm_model
             case "ollama":
-                return self.ollama_embedding_model  # fallback for local
+                return self.ollama_llm_model
             case _:  # groq (default)
                 return self.groq_llm_model
 
     @property
     def active_embedding_model(self) -> str:
         """Return active embedding model name based on configured provider."""
-        match self.llm_provider:
+        match self.embedding_provider:
+            case "gemini":
+                return self.gemini_embedding_model
             case "openai":
                 return self.openai_embedding_model
             case _:
@@ -150,11 +154,10 @@ class Settings(BaseSettings):
 
     @property
     def active_llm_base_url(self) -> str:
-        """
-        Groq uses the OpenAI-compatible API format.
-        This means we can use the openai SDK pointed at Groq's endpoint.
-        """
+        """Return active base URL for OpenAI-compatible LLM endpoint."""
         match self.llm_provider:
+            case "gemini":
+                return "https://generativelanguage.googleapis.com/v1beta/openai/"
             case "openai":
                 return "https://api.openai.com/v1"
             case "ollama":
@@ -166,6 +169,8 @@ class Settings(BaseSettings):
     def active_llm_api_key(self) -> str:
         """Return the API key for the active provider."""
         match self.llm_provider:
+            case "gemini":
+                return self.gemini_api_key
             case "openai":
                 return self.openai_api_key
             case "ollama":

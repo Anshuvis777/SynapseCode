@@ -182,16 +182,16 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider):
         pass
 
 
-class HuggingFaceEmbeddingProvider(EmbeddingProvider):
+class GeminiEmbeddingProvider(EmbeddingProvider):
     """
-    Embedding provider using Hugging Face's Serverless Inference API.
+    Embedding provider using Google Gemini's REST API (Google AI Studio).
     Bypasses local memory constraints by executing inference in the cloud.
     """
 
     def __init__(self, api_key: str | None = None) -> None:
-        self._model = settings.huggingface_embedding_model
-        self._dims = settings.embedding_dimensions
-        self._api_key = api_key or settings.huggingface_api_key
+        self._model = settings.gemini_embedding_model
+        self._dims = settings.embedding_dimensions  # Defaults to 384
+        self._api_key = api_key or settings.gemini_api_key
 
     @property
     def dimensions(self) -> int:
@@ -207,11 +207,11 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         return embeddings[0]
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed a batch of texts remotely via HF Inference API."""
+        """Embed a batch of texts remotely via Gemini API."""
         if not self._api_key:
             raise ValueError(
-                "Hugging Face Access Token is not configured. "
-                "Please configure your Hugging Face API Token in your Profile settings (bottom-left card)."
+                "Gemini API Key is not configured. "
+                "Please configure your Gemini API Key in your Profile settings (bottom-left card)."
             )
         return await asyncio.to_thread(self._embed_batch_sync, texts)
 
@@ -224,17 +224,24 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         if not cleaned:
             return []
 
-        url = "https://router.huggingface.co/hf-inference/v1/embeddings"
-        payload = json.dumps({
-            "model": self._model,
-            "input": cleaned
-        }).encode("utf-8")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model.split('/')[-1]}:batchEmbedContents?key={self._api_key}"
         
+        # Build batch requests payload
+        requests_payload = []
+        for text in cleaned:
+            requests_payload.append({
+                "model": f"models/{self._model.split('/')[-1]}",
+                "content": {
+                    "parts": [{"text": text or "empty"}]
+                },
+                "outputDimensionality": self._dims
+            })
+            
+        payload = json.dumps({"requests": requests_payload}).encode("utf-8")
         req = urllib.request.Request(
             url,
             data=payload,
             headers={
-                "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
             },
             method="POST",
@@ -245,42 +252,46 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8") if e else ""
-            logger.error("huggingface_inference_http_error", code=e.code, body=err_body)
-            raise ValueError(f"Hugging Face API returned HTTP {e.code}: {err_body}") from e
+            logger.error("gemini_embeddings_http_error", code=e.code, body=err_body)
+            raise ValueError(f"Gemini API returned HTTP {e.code}: {err_body}") from e
         except Exception as e:
-            logger.error("huggingface_inference_connection_error", error=str(e))
-            raise ValueError(f"Failed to connect to Hugging Face Inference API: {str(e)}") from e
+            logger.error("gemini_embeddings_connection_error", error=str(e))
+            raise ValueError(f"Failed to connect to Gemini API: {str(e)}") from e
 
-        if not isinstance(data, dict) or "data" not in data:
-            logger.error("huggingface_embed_response_invalid", type=str(type(data)), content=str(data))
-            raise ValueError(f"Invalid response from Hugging Face Inference API: {data}")
+        if not isinstance(data, dict) or "embeddings" not in data:
+            logger.error("gemini_embed_response_invalid", type=str(type(data)), content=str(data))
+            raise ValueError(f"Invalid response from Gemini API: {data}")
 
-        # Parse OpenAI-compatible format
         parsed_embeddings = []
-        for item in sorted(data["data"], key=lambda x: x.get("index", 0)):
-            embedding = item.get("embedding")
-            if isinstance(embedding, list) and len(embedding) > 0:
-                parsed_embeddings.append([float(val) for val in embedding])
+        for item in data["embeddings"]:
+            values = item.get("values")
+            if isinstance(values, list) and len(values) > 0:
+                parsed_embeddings.append([float(val) for val in values])
             else:
-                logger.warning("huggingface_embed_item_invalid", item=str(item))
+                logger.warning("gemini_embed_item_invalid", item=str(item))
                 parsed_embeddings.append([0.0] * self._dims)
 
+        if len(parsed_embeddings) != len(cleaned):
+            raise ValueError(
+                f"Requested {len(cleaned)} embeddings, but received {len(parsed_embeddings)} from Gemini."
+            )
+
         logger.info(
-            "huggingface_embed_batch_complete",
+            "gemini_embed_batch_complete",
             total=len(texts),
             model=self._model,
         )
         return parsed_embeddings
 
     async def health_check(self) -> bool:
-        """Verify the Hugging Face API key and model availability."""
+        """Verify the Gemini API key and model availability."""
         try:
             await self.embed_text("health check")
             return True
         except Exception as e:
-            logger.warning("huggingface_health_check_failed", error=str(e))
+            logger.warning("gemini_health_check_failed", error=str(e))
             return False
 
     async def aclose(self) -> None:
-        """Close the HTTP client."""
+        """Close client."""
         pass

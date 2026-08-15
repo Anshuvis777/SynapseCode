@@ -27,6 +27,30 @@ def _create_llm_provider(provider: str | None = None, api_key: str | None = None
     provider_name = (provider or settings.llm_provider).lower()
 
     match provider_name:
+        case "gemini":
+            key = api_key or settings.gemini_api_key
+            if not key:
+                raise ValueError(
+                    "LLM_PROVIDER=gemini but GEMINI_API_KEY is not set. "
+                    "Please configure your Gemini API Key in your Profile settings."
+                )
+            from app.providers.openai import OpenAIProvider
+
+            logger.info("llm_provider_selected", provider="gemini", model=settings.gemini_llm_model)
+
+            class GeminiLLMProvider(OpenAIProvider):
+                def __init__(self, api_key: str | None = None) -> None:
+                    from openai import AsyncOpenAI
+                    self._client = AsyncOpenAI(
+                        api_key=api_key or settings.gemini_api_key,
+                        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                    )
+                    self._model = settings.gemini_llm_model
+                    self._default_temperature = settings.llm_temperature
+                    self._default_max_tokens = settings.llm_max_tokens
+
+            return GeminiLLMProvider(api_key=key)
+
         case "groq":
             from app.providers.groq import GroqProvider
 
@@ -101,27 +125,27 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
         )
         return OpenAIEmbeddingProvider(api_key=key)
 
-    elif provider_name == "huggingface":
-        key = api_key or settings.huggingface_api_key
-        from app.providers.embeddings import HuggingFaceEmbeddingProvider
+    elif provider_name == "gemini":
+        key = api_key or settings.gemini_api_key
+        from app.providers.embeddings import GeminiEmbeddingProvider
 
         logger.info(
             "embedding_provider_selected",
-            provider="huggingface",
-            model=settings.huggingface_embedding_model,
+            provider="gemini",
+            model=settings.gemini_embedding_model,
         )
-        return HuggingFaceEmbeddingProvider(api_key=key)
+        return GeminiEmbeddingProvider(api_key=key)
 
     else:
-        # Fall back to huggingface to prevent startup crash on Render Free Tier
+        # Fall back to gemini to prevent startup crash on Render Free Tier
         logger.warning(
             "embedding_provider_fallback",
             requested=provider_name,
-            fallback="huggingface",
+            fallback="gemini",
         )
-        key = api_key or settings.huggingface_api_key
-        from app.providers.embeddings import HuggingFaceEmbeddingProvider
-        return HuggingFaceEmbeddingProvider(api_key=key)
+        key = api_key or settings.gemini_api_key
+        from app.providers.embeddings import GeminiEmbeddingProvider
+        return GeminiEmbeddingProvider(api_key=key)
 
 
 @lru_cache(maxsize=1)
