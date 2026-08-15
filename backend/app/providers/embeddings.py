@@ -192,16 +192,6 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         self._model = settings.huggingface_embedding_model
         self._dims = settings.embedding_dimensions
         self._api_key = api_key or settings.huggingface_api_key
-        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
-        self._client = httpx.AsyncClient(
-            transport=transport,
-            base_url="https://api-inference.huggingface.co",
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=30.0,
-        )
 
     @property
     def dimensions(self) -> int:
@@ -223,16 +213,39 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
                 "Hugging Face Access Token is not configured. "
                 "Please configure your Hugging Face API Token in your Profile settings (bottom-left card)."
             )
+        return await asyncio.to_thread(self._embed_batch_sync, texts)
+
+    def _embed_batch_sync(self, texts: list[str]) -> list[list[float]]:
+        import json
+        import urllib.request
+        import urllib.error
+
         cleaned = [t.strip() for t in texts]
         if not cleaned:
             return []
 
-        response = await self._client.post(
-            f"/models/{self._model}",
-            json={"inputs": cleaned, "options": {"wait_for_model": True}},
+        url = f"https://api-inference.huggingface.co/models/{self._model}"
+        payload = json.dumps({"inputs": cleaned, "options": {"wait_for_model": True}}).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
         )
-        response.raise_for_status()
-        data = response.json()
+
+        try:
+            with urllib.request.urlopen(req, timeout=30.0) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8") if e else ""
+            logger.error("huggingface_inference_http_error", code=e.code, body=err_body)
+            raise ValueError(f"Hugging Face API returned HTTP {e.code}: {err_body}") from e
+        except Exception as e:
+            logger.error("huggingface_inference_connection_error", error=str(e))
+            raise ValueError(f"Failed to connect to Hugging Face Inference API: {str(e)}") from e
 
         if not isinstance(data, list):
             logger.error("huggingface_embed_response_invalid", type=str(type(data)), content=str(data))
@@ -261,12 +274,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
     async def health_check(self) -> bool:
         """Verify the Hugging Face API key and model availability."""
         try:
-            response = await self._client.post(
-                f"/models/{self._model}",
-                json={"inputs": "test", "options": {"wait_for_model": True}},
-                timeout=10.0,
-            )
-            response.raise_for_status()
+            await self.embed_text("health check")
             return True
         except Exception as e:
             logger.warning("huggingface_health_check_failed", error=str(e))
@@ -274,4 +282,4 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
 
     async def aclose(self) -> None:
         """Close the HTTP client."""
-        await self._client.aclose()
+        pass
