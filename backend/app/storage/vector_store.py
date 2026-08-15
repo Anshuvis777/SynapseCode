@@ -62,31 +62,27 @@ class QdrantVectorStore:
                             distance=rest_models.Distance.COSINE,
                         ),
                     )
-                    # Create payload indexes for faster queries
-                    if collection_name == self.collection_chunks:
+                
+                # Idempotently ensure payload indexes exist (even for pre-existing collections)
+                if collection_name == self.collection_chunks:
+                    for field in ["user_id", "repository_id", "document_id"]:
+                        try:
+                            await self.client.create_payload_index(
+                                collection_name=collection_name,
+                                field_name=field,
+                                field_schema=rest_models.PayloadSchemaType.KEYWORD,
+                            )
+                        except Exception as e:
+                            logger.debug("payload_index_exists_or_failed", field=field, error=str(e))
+                elif collection_name == self.collection_memories:
+                    try:
                         await self.client.create_payload_index(
                             collection_name=collection_name,
                             field_name="user_id",
                             field_schema=rest_models.PayloadSchemaType.KEYWORD,
                         )
-                        await self.client.create_payload_index(
-                            collection_name=collection_name,
-                            field_name="repository_id",
-                            field_schema=rest_models.PayloadSchemaType.KEYWORD,
-                        )
-                        await self.client.create_payload_index(
-                            collection_name=collection_name,
-                            field_name="document_id",
-                            field_schema=rest_models.PayloadSchemaType.KEYWORD,
-                        )
-                    elif collection_name == self.collection_memories:
-                        await self.client.create_payload_index(
-                            collection_name=collection_name,
-                            field_name="user_id",
-                            field_schema=rest_models.PayloadSchemaType.KEYWORD,
-                        )
-                else:
-                    logger.debug("qdrant_collection_exists", collection=collection_name)
+                    except Exception as e:
+                        logger.debug("payload_index_exists_or_failed", field="user_id", error=str(e))
             except UnexpectedResponse as e:
                 logger.error(
                     "qdrant_collection_init_failed", collection=collection_name, error=str(e)
