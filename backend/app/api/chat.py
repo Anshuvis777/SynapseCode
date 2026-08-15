@@ -190,6 +190,7 @@ async def send_message(
     payload: MessageCreate,
     x_llm_provider: str | None = Header(None, alias="X-LLM-Provider"),
     x_llm_api_key: str | None = Header(None, alias="X-LLM-API-Key"),
+    x_embedding_api_key: str | None = Header(None, alias="X-Embedding-API-Key"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
@@ -232,13 +233,14 @@ async def send_message(
             user_id=current_user.id,
             repository_id=session.repo_id,
             query=payload.content,
+            embedding_api_key=x_embedding_api_key,
         )
     context_str = retrieval_service.format_context_prompt(chunks) if chunks else ""
 
     # 4. Fetch long-term developer memories from Qdrant
     memories_str = ""
     try:
-        embedder = get_embedding_provider()
+        embedder = get_embedding_provider(api_key=x_embedding_api_key)
         query_vector = await embedder.embed_text(payload.content)
         memories = await vector_store.search_memories(
             user_id=current_user.id,

@@ -92,8 +92,6 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
 
     if provider_name == "openai":
         key = api_key or settings.openai_api_key
-        if not key:
-            raise ValueError("EMBEDDING_PROVIDER=openai but OPENAI_API_KEY / custom key is not set.")
         from app.providers.openai import OpenAIEmbeddingProvider
 
         logger.info(
@@ -105,8 +103,6 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
 
     elif provider_name == "huggingface":
         key = api_key or settings.huggingface_api_key
-        if not key:
-            raise ValueError("EMBEDDING_PROVIDER=huggingface but HUGGINGFACE_API_KEY / custom key is not set.")
         from app.providers.embeddings import HuggingFaceEmbeddingProvider
 
         logger.info(
@@ -117,10 +113,15 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
         return HuggingFaceEmbeddingProvider(api_key=key)
 
     else:
-        raise ValueError(
-            f"Embedding provider '{provider_name}' is disabled to prevent container Out-Of-Memory (OOM) crashes. "
-            "Please use cloud API-based embedding providers: 'huggingface' (free) or 'openai' (paid)."
+        # Fall back to huggingface to prevent startup crash on Render Free Tier
+        logger.warning(
+            "embedding_provider_fallback",
+            requested=provider_name,
+            fallback="huggingface",
         )
+        key = api_key or settings.huggingface_api_key
+        from app.providers.embeddings import HuggingFaceEmbeddingProvider
+        return HuggingFaceEmbeddingProvider(api_key=key)
 
 
 @lru_cache(maxsize=1)

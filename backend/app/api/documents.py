@@ -14,7 +14,7 @@ import uuid
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,6 +75,7 @@ async def upload_document(
     file: UploadFile = File(...),
     repo_id: uuid.UUID | None = Form(None),
     current_user: User = Depends(get_current_user),
+    x_embedding_api_key: str | None = Header(None, alias="X-Embedding-API-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> Document:
     """
@@ -129,7 +130,7 @@ async def upload_document(
     # 3. Fire Celery background parsing and embedding task
     from app.workers.tasks import process_document_task
 
-    process_document_task.delay(str(doc.id))
+    process_document_task.delay(str(doc.id), embedding_api_key=x_embedding_api_key)
 
     logger.info("document_upload_registered", doc_id=str(doc.id), filename=filename)
     return doc
@@ -144,6 +145,7 @@ async def upload_document(
 async def ingest_url(
     payload: URLIngestPayload,
     current_user: User = Depends(get_current_user),
+    x_embedding_api_key: str | None = Header(None, alias="X-Embedding-API-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> Document:
     """
@@ -204,7 +206,7 @@ async def ingest_url(
     # 5. Fire Celery background task
     from app.workers.tasks import process_document_task
 
-    process_document_task.delay(str(doc.id))
+    process_document_task.delay(str(doc.id), embedding_api_key=x_embedding_api_key)
 
     logger.info("url_ingestion_registered", doc_id=str(doc.id), url=payload.url)
     return doc

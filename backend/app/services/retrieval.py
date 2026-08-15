@@ -33,6 +33,7 @@ class RetrievalService:
         repository_id: uuid.UUID | None,
         query: str,
         limit: int = 6,
+        embedding_api_key: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Embed the user query, execute semantic search in Qdrant,
@@ -46,7 +47,8 @@ class RetrievalService:
         logger.info("retrieving_context", repo_id=str(repository_id), query=query)
 
         # 1. Embed query
-        query_vector = await self.embedding_provider.embed_text(query)
+        provider = get_embedding_provider(api_key=embedding_api_key) if embedding_api_key else self.embedding_provider
+        query_vector = await provider.embed_text(query)
 
         # 2. Query Qdrant with tenant isolation
         chunks = await self.vector_store.search_code_chunks(

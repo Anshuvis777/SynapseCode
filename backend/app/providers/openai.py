@@ -121,6 +121,11 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         return response.data[0].embedding
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not self._client.api_key or self._client.api_key == "sk-byok_placeholder":
+            raise ValueError(
+                "OpenAI API Key is not configured. "
+                "Please configure your OpenAI API Key in your Profile settings (bottom-left card)."
+            )
         cleaned = [t.strip() or "empty" for t in texts]
         response = await self._client.embeddings.create(
             model=self._model,

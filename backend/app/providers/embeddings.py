@@ -216,6 +216,11 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts remotely via HF Inference API."""
+        if not self._api_key:
+            raise ValueError(
+                "Hugging Face Access Token is not configured. "
+                "Please configure your Hugging Face API Token in your Profile settings (bottom-left card)."
+            )
         cleaned = [t.strip() for t in texts]
         if not cleaned:
             return []

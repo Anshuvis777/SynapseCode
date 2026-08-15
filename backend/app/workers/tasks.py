@@ -167,7 +167,7 @@ def index_repository_task(self, repo_id_str: str, user_id_str: str, embedding_ap
     return _run_async(lambda: _async_index_repository(repo_id, user_id, embedding_api_key=embedding_api_key))
 
 
-async def _async_process_document(doc_id: uuid.UUID) -> bool:
+async def _async_process_document(doc_id: uuid.UUID, embedding_api_key: str | None = None) -> bool:
     """Async implementation of the document parsing and embedding pipeline."""
     from app.models.document import Document
     from app.utils.parser import chunk_file_content
@@ -226,7 +226,7 @@ async def _async_process_document(doc_id: uuid.UUID) -> bool:
 
             # 3. Generate embeddings
             texts = [c["content"] for c in chunks]
-            embed_provider = get_embedding_provider()
+            embed_provider = get_embedding_provider(api_key=embedding_api_key)
             embeddings = await embed_provider.embed_batch(texts)
 
             # 4. Upsert into Qdrant Vector database
@@ -256,9 +256,9 @@ async def _async_process_document(doc_id: uuid.UUID) -> bool:
 
 
 @celery_app.task(name="app.workers.tasks.process_document_task", bind=True, max_retries=3)
-def process_document_task(self, doc_id_str: str) -> bool:
+def process_document_task(self, doc_id_str: str, embedding_api_key: str | None = None) -> bool:
     """
     Celery background worker entry point for processing documents.
     """
     doc_id = uuid.UUID(doc_id_str)
-    return _run_async(lambda: _async_process_document(doc_id))
+    return _run_async(lambda: _async_process_document(doc_id, embedding_api_key=embedding_api_key))
