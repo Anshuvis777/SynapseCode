@@ -65,7 +65,7 @@ class QdrantVectorStore:
                 
                 # Idempotently ensure payload indexes exist (even for pre-existing collections)
                 if collection_name == self.collection_chunks:
-                    for field in ["user_id", "repository_id", "document_id"]:
+                    for field in ["user_id", "repository_id", "document_id", "file_path"]:
                         try:
                             await self.client.create_payload_index(
                                 collection_name=collection_name,
