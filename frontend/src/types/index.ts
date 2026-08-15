@@ -8,6 +8,7 @@ export interface User {
   llmProvider?: 'groq' | 'openai';
   groqApiKey?: string;
   openaiApiKey?: string;
+  huggingfaceApiKey?: string;
 }
 
 export type MessageRole = 'user' | 'assistant';

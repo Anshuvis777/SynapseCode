@@ -22,7 +22,6 @@ class RepositoryCreate(BaseModel):
         description="Source of the repo: 'github' or 'local_zip'",
     )
     description: str | None = Field(default=None, max_length=1000)
-    embedding_api_key: str | None = Field(default=None, description="Optional embedding API key (not saved in database)")
 
 
 class RepositoryResponse(BaseModel):

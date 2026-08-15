@@ -13,7 +13,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,7 @@ router = APIRouter()
 async def create_repository(
     payload: RepositoryCreate,
     current_user: User = Depends(get_current_user),
+    x_embedding_api_key: str | None = Header(None, alias="X-Embedding-API-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> Repository:
     """
@@ -82,7 +83,7 @@ async def create_repository(
     await db.flush()
 
     # Trigger background Celery indexing task
-    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=payload.embedding_api_key)
+    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key)
 
     logger.info("repository_created", repo_id=str(repo.id), repo_name=repo.name)
     return repo
@@ -191,6 +192,7 @@ async def delete_repository(
 async def reindex_repository(
     repo_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
+    x_embedding_api_key: str | None = Header(None, alias="X-Embedding-API-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> Repository:
     """
@@ -227,7 +229,7 @@ async def reindex_repository(
         logger.warning("failed_to_clear_vectors_before_reindex", repo_id=str(repo_id), error=str(e))
 
     # Re-trigger indexing task
-    index_repository_task.delay(str(repo.id), str(current_user.id))
+    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key)
 
     logger.info("reindex_triggered", repo_id=str(repo.id))
     return repo

@@ -103,16 +103,6 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
         )
         return OpenAIEmbeddingProvider(api_key=key)
 
-    elif provider_name == "ollama":
-        from app.providers.embeddings import OllamaEmbeddingProvider
-
-        logger.info(
-            "embedding_provider_selected",
-            provider="ollama",
-            model=settings.ollama_embedding_model,
-        )
-        return OllamaEmbeddingProvider()
-
     elif provider_name == "huggingface":
         key = api_key or settings.huggingface_api_key
         if not key:
@@ -127,14 +117,10 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
         return HuggingFaceEmbeddingProvider(api_key=key)
 
     else:
-        from app.providers.embeddings import FastEmbedEmbeddingProvider
-
-        logger.info(
-            "embedding_provider_selected",
-            provider="fastembed",
-            model="nomic-ai/nomic-embed-text-v1.5",
+        raise ValueError(
+            f"Embedding provider '{provider_name}' is disabled to prevent container Out-Of-Memory (OOM) crashes. "
+            "Please use cloud API-based embedding providers: 'huggingface' (free) or 'openai' (paid)."
         )
-        return FastEmbedEmbeddingProvider()
 
 
 @lru_cache(maxsize=1)

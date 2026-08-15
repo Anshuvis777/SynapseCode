@@ -40,10 +40,11 @@ export const DashboardLayout: React.FC = () => {
   const [profileProvider, setProfileProvider] = useState<'groq' | 'openai'>('groq');
   const [profileGroqKey, setProfileGroqKey] = useState('');
   const [profileOpenAIKey, setProfileOpenAIKey] = useState('');
+  const [profileHuggingFaceKey, setProfileHuggingFaceKey] = useState('');
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile(profileName, profileEmail, profileProvider, profileGroqKey, profileOpenAIKey);
+    updateProfile(profileName, profileEmail, profileProvider, profileGroqKey, profileOpenAIKey, profileHuggingFaceKey);
     setIsProfileOpen(false);
   };
 
@@ -144,6 +145,7 @@ export const DashboardLayout: React.FC = () => {
                   setProfileProvider(user?.llmProvider || 'groq');
                   setProfileGroqKey(user?.groqApiKey || '');
                   setProfileOpenAIKey(user?.openaiApiKey || '');
+                  setProfileHuggingFaceKey(user?.huggingfaceApiKey || '');
                   setIsProfileOpen(true);
                 }}
                 title="View/Edit Profile"
@@ -180,6 +182,7 @@ export const DashboardLayout: React.FC = () => {
                   setProfileProvider(user?.llmProvider || 'groq');
                   setProfileGroqKey(user?.groqApiKey || '');
                   setProfileOpenAIKey(user?.openaiApiKey || '');
+                  setProfileHuggingFaceKey(user?.huggingfaceApiKey || '');
                   setIsProfileOpen(true);
                 }}
                 title="View/Edit Profile"
@@ -311,6 +314,20 @@ export const DashboardLayout: React.FC = () => {
                   </span>
                 </div>
               )}
+
+              <div className="space-y-1.5 border-t border-zinc-800/60 pt-3">
+                <label className="text-[10.5px] font-bold text-zinc-400 uppercase tracking-wide">Hugging Face API Token</label>
+                <input 
+                  type="password"
+                  value={profileHuggingFaceKey}
+                  onChange={(e) => setProfileHuggingFaceKey(e.target.value)}
+                  className="w-full bg-[#060608] border border-[#1c1c21] rounded px-3 py-2 text-xs text-zinc-200 outline-none focus:border-zinc-700 transition"
+                  placeholder="hf_... (Optional)"
+                />
+                <span className="text-[9px] text-zinc-500 block leading-normal">
+                  Provide your own Hugging Face token to run free cloud embeddings when syncing codebases.
+                </span>
+              </div>
 
               {/* Privacy & Zero-Retention Security Badge */}
               <div className="p-3 bg-zinc-950/80 border border-zinc-800/80 rounded-lg text-[10.5px] text-zinc-400 space-y-1">

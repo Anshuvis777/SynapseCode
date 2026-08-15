@@ -10,7 +10,7 @@ interface UserState {
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => void;
   clearError: () => void;
-  updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string) => void;
+  updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string, huggingfaceApiKey?: string) => void;
   registerUser: (email: string, name: string, password?: string) => Promise<boolean>;
 }
 
@@ -86,7 +86,7 @@ export const useUserStore = create<UserState>((set, get) => {
       set({ user: null, isAuthenticated: false });
     },
 
-    updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string) => {
+    updateProfile: (name: string, email: string, llmProvider?: 'groq' | 'openai', groqApiKey?: string, openaiApiKey?: string, huggingfaceApiKey?: string) => {
       set((state) => {
         if (!state.user) return state;
         const updatedUser = {
@@ -96,6 +96,7 @@ export const useUserStore = create<UserState>((set, get) => {
           llmProvider,
           groqApiKey,
           openaiApiKey,
+          huggingfaceApiKey,
           apiKey: llmProvider === 'openai' ? openaiApiKey : groqApiKey,
           avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(email)}`,
         };

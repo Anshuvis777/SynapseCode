@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     # Ollama — FREE, LOCAL (for embeddings only — no GPU needed for small embed models)
     ollama_base_url: str = Field(default="http://ollama:11434")
     ollama_embedding_model: str = Field(default="nomic-embed-text")
-    embedding_provider: str = Field(default="fastembed")  # "fastembed" | "ollama" | "openai" | "huggingface"
+    embedding_provider: str = Field(default="huggingface")  # "huggingface" | "openai" (local providers disabled)
 
     # Hugging Face — FREE Serverless Inference API (get token at huggingface.co/settings/tokens)
     huggingface_api_key: str = Field(default="")

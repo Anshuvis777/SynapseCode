@@ -27,6 +27,9 @@ apiClient.interceptors.request.use(
         if (activeKey) {
           config.headers['X-LLM-API-Key'] = activeKey;
         }
+        if (user.huggingfaceApiKey) {
+          config.headers['X-Embedding-API-Key'] = user.huggingfaceApiKey;
+        }
       } catch (e) {
         console.error('Error parsing stored user for auth token', e);
       }
