@@ -224,8 +224,12 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
         if not cleaned:
             return []
 
-        url = f"https://api-inference.huggingface.co/models/{self._model}"
-        payload = json.dumps({"inputs": cleaned, "options": {"wait_for_model": True}}).encode("utf-8")
+        url = "https://router.huggingface.co/hf-inference/v1/embeddings"
+        payload = json.dumps({
+            "model": self._model,
+            "input": cleaned
+        }).encode("utf-8")
+        
         req = urllib.request.Request(
             url,
             data=payload,
@@ -247,19 +251,16 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
             logger.error("huggingface_inference_connection_error", error=str(e))
             raise ValueError(f"Failed to connect to Hugging Face Inference API: {str(e)}") from e
 
-        if not isinstance(data, list):
+        if not isinstance(data, dict) or "data" not in data:
             logger.error("huggingface_embed_response_invalid", type=str(type(data)), content=str(data))
             raise ValueError(f"Invalid response from Hugging Face Inference API: {data}")
 
+        # Parse OpenAI-compatible format
         parsed_embeddings = []
-        for item in data:
-            if isinstance(item, list) and len(item) > 0:
-                if isinstance(item[0], list):
-                    # 3D hidden states (e.g. token level) -> take CLS representation (index 0)
-                    parsed_embeddings.append([float(val) for val in item[0]])
-                else:
-                    # 2D pooled sentence representation
-                    parsed_embeddings.append([float(val) for val in item])
+        for item in sorted(data["data"], key=lambda x: x.get("index", 0)):
+            embedding = item.get("embedding")
+            if isinstance(embedding, list) and len(embedding) > 0:
+                parsed_embeddings.append([float(val) for val in embedding])
             else:
                 logger.warning("huggingface_embed_item_invalid", item=str(item))
                 parsed_embeddings.append([0.0] * self._dims)
