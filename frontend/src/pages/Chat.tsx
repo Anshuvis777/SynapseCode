@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Plus, Trash2, Send, Bot, User as UserIcon, Database, Sparkles, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageSquare, Plus, Trash2, Send, Bot, User as UserIcon, Database, Sparkles, ShieldCheck, Download, FileJson, FileText, Pencil, Check, X, ThumbsUp, ThumbsDown, RotateCcw, Copy } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { useRepositoryStore } from '../store/repositoryStore';
 import { useUserStore } from '../store/userStore';
@@ -7,6 +7,7 @@ import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../utils';
+import { exportSessionAsMarkdown, exportSessionAsJSON, downloadFile } from '../utils/exportChat';
 
 export const Chat: React.FC = () => {
   const { 
@@ -24,8 +25,17 @@ export const Chat: React.FC = () => {
   const { user } = useUserStore();
 
   const [input, setInput] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down' | undefined>>({});
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null;
   const messages = activeSession?.messages || [];
@@ -47,7 +57,71 @@ export const Chat: React.FC = () => {
     }
   }, [activeSessionId, activeSession?.repositoryId]);
 
+  // Autofill pending prompts (e.g. from code search page clicks)
+  useEffect(() => {
+    const pending = localStorage.getItem('codexrag_pending_prompt');
+    if (pending && activeSessionId) {
+      setInput(pending);
+      localStorage.removeItem('codexrag_pending_prompt');
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + 'px';
+        }
+      }, 100);
+    }
+  }, [activeSessionId]);
+
+  const handleCopyMessage = (msgId: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(msgId);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
+
+  const handleFeedback = (msgId: string, type: 'up' | 'down') => {
+    setFeedbackMap((prev) => ({
+      ...prev,
+      [msgId]: prev[msgId] === type ? undefined : type,
+    }));
+  };
+
+  const handleRegenerate = async () => {
+    if (isStreaming || !activeSessionId) return;
+    const userMessages = messages.filter((m) => m.role === 'user');
+    if (userMessages.length === 0) return;
+    const lastUserMsg = userMessages[userMessages.length - 1];
+    const targetRepoId = activeSession?.repositoryId || activeRepositoryId || undefined;
+    await sendMessage(lastUserMsg.content, targetRepoId);
+  };
+
+  // Close export menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const hasApiKey = !!(user?.geminiApiKey || (user as any)?.huggingfaceApiKey);
+
+  const handleExportMarkdown = () => {
+    if (!activeSession) return;
+    const md = exportSessionAsMarkdown(activeSession);
+    const safeName = activeSession.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+    downloadFile(md, `${safeName}.md`, 'text/markdown');
+    setShowExportMenu(false);
+  };
+
+  const handleExportJSON = () => {
+    if (!activeSession) return;
+    const json = exportSessionAsJSON(activeSession);
+    const safeName = activeSession.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+    downloadFile(json, `${safeName}.json`, 'application/json');
+    setShowExportMenu(false);
+  };
 
   const handleContextChange = async (repoId: string | null, docId: string | null = null) => {
     setActiveRepository(repoId);
@@ -70,6 +144,39 @@ export const Chat: React.FC = () => {
     const newId = await createSession(activeRepositoryId || undefined);
     selectSession(newId);
   };
+
+  // Session rename handlers
+  const startRename = (sessionId: string, currentTitle: string) => {
+    setRenamingSessionId(sessionId);
+    setRenameValue(currentTitle);
+    setTimeout(() => renameInputRef.current?.focus(), 50);
+  };
+
+  const confirmRename = async () => {
+    if (!renamingSessionId || !renameValue.trim()) return;
+    // Update title in local state (sessions array)
+    useChatStore.setState((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === renamingSessionId ? { ...s, title: renameValue.trim() } : s
+      ),
+    }));
+    setRenamingSessionId(null);
+    setRenameValue('');
+  };
+
+  const cancelRename = () => {
+    setRenamingSessionId(null);
+    setRenameValue('');
+  };
+
+  // Auto-grow textarea
+  const handleTextareaInput = useCallback(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    }
+  }, []);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#060608]">
@@ -96,10 +203,10 @@ export const Chat: React.FC = () => {
               const isActive = session.id === activeSessionId;
               const hasRepo = repositories.find((r) => r.id === session.repositoryId);
               
-              return (
+               return (
                 <div
                   key={session.id}
-                  onClick={() => selectSession(session.id)}
+                  onClick={() => renamingSessionId !== session.id && selectSession(session.id)}
                   className={cn(
                     "group relative flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all",
                     isActive 
@@ -107,26 +214,61 @@ export const Chat: React.FC = () => {
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-[#111115]"
                   )}
                 >
-                  <div className="flex items-start gap-2.5 overflow-hidden pr-6">
+                  <div className="flex items-start gap-2.5 overflow-hidden pr-14">
                     <MessageSquare className={cn("w-4 h-4 mt-0.5 flex-shrink-0", isActive ? "text-blue-500" : "text-zinc-500")} />
                     <div className="overflow-hidden">
-                      <h4 className="text-xs font-semibold truncate leading-tight">{session.title}</h4>
+                      {renamingSessionId === session.id ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            ref={renameInputRef}
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') confirmRename();
+                              if (e.key === 'Escape') cancelRename();
+                            }}
+                            className="text-xs font-semibold bg-zinc-950 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-200 outline-none focus:border-blue-500 w-32"
+                          />
+                          <button onClick={confirmRename} className="p-0.5 text-emerald-400 hover:text-emerald-300 transition">
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button onClick={cancelRename} className="p-0.5 text-zinc-500 hover:text-zinc-300 transition">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <h4 className="text-xs font-semibold truncate leading-tight">{session.title}</h4>
+                      )}
                       <p className="text-[9px] text-zinc-500 mt-0.5 truncate">
                         {hasRepo ? `Repo: ${hasRepo.name}` : 'No Repository'}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSession(session.id);
-                    }}
-                    className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded transition"
-                    title="Delete Chat"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="absolute right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                    {renamingSessionId !== session.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRename(session.id, session.title);
+                        }}
+                        className="p-1 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 rounded transition"
+                        title="Rename Chat"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(session.id);
+                      }}
+                      className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded transition"
+                      title="Delete Chat"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -144,6 +286,41 @@ export const Chat: React.FC = () => {
         {/* Active Session Content */}
         {activeSession ? (
           <>
+            {/* Export Header Bar */}
+            {messages.length > 0 && (
+              <div className="flex items-center justify-end px-4 md:px-6 pt-3 pb-0">
+                <div className="relative" ref={exportMenuRef}>
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-400 hover:text-zinc-200 bg-[#0d0d10]/65 backdrop-blur-xl border border-white/[0.06] rounded-lg hover:border-white/[0.1] transition-all shadow-depth-1"
+                    title="Export chat session"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export</span>
+                  </button>
+                  {showExportMenu && (
+                    <div className="absolute right-0 top-full mt-1.5 w-44 bg-[#0d0d10]/90 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-depth-3 z-50 animate-fade-in-up overflow-hidden">
+                      <button
+                        onClick={handleExportMarkdown}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Export as Markdown</span>
+                      </button>
+                      <div className="border-t border-white/[0.04]" />
+                      <button
+                        onClick={handleExportJSON}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors"
+                      >
+                        <FileJson className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Export as JSON</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Messages Scroll Area */}
             <div 
               ref={chatContainerRef}
@@ -181,18 +358,19 @@ export const Chat: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-6 max-w-3xl mx-auto">
-                  {messages.map((message) => {
+                  {messages.map((message, msgIndex) => {
                     const isUser = message.role === 'user';
                     
                     return (
                       <div 
-                        key={message.id} 
+                        key={message.id}
                         className={cn(
-                          "flex gap-4 p-4 rounded-xl border transition-colors max-w-[90%]",
+                          "flex gap-4 p-4 rounded-xl border transition-colors max-w-[90%] animate-fade-in-up",
                           isUser 
-                            ? "bg-[#18181b] border-[#27272a] ml-auto" 
-                            : "bg-[#0d0d10] border-[#1c1c21] mr-auto"
+                            ? "bg-[#18181b]/65 backdrop-blur-sm border-[#27272a] ml-auto" 
+                            : "bg-[#0d0d10]/65 backdrop-blur-sm border-white/[0.06] mr-auto"
                         )}
+                        style={{ animationDelay: `${Math.min(msgIndex * 0.05, 0.3)}s` }}
                       >
                         {/* Avatar */}
                         <div className="flex-shrink-0">
@@ -224,10 +402,16 @@ export const Chat: React.FC = () => {
                               <MarkdownRenderer content={message.content} />
                             ) : (
                               message.status === 'streaming' && (
-                                <div className="flex items-center gap-1.5 py-2">
-                                  <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" />
-                                  <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0.2s]" />
-                                  <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce [animation-delay:0.4s]" />
+                                <div className="space-y-2.5 py-2">
+                                  <div className="flex items-center gap-2 text-[11px] text-blue-400 font-semibold">
+                                    <div className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+                                    <span>Thinking...</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="h-3 rounded-full animate-shimmer w-[85%]" />
+                                    <div className="h-3 rounded-full animate-shimmer w-[60%]" style={{ animationDelay: '0.15s' }} />
+                                    <div className="h-3 rounded-full animate-shimmer w-[72%]" style={{ animationDelay: '0.3s' }} />
+                                  </div>
                                 </div>
                               )
                             )}
@@ -235,12 +419,75 @@ export const Chat: React.FC = () => {
 
                           {/* Streaming cursor */}
                           {message.status === 'streaming' && message.content && (
-                            <span className="inline-block w-1.5 h-4 ml-0.5 bg-blue-400 animate-pulse-slow" />
+                            <span className="inline-block w-1.5 h-4 ml-0.5 bg-blue-400 rounded-sm animate-pulse-slow" />
+                          )}
+
+                          {/* Message actions */}
+                          {message.content && !isStreaming && (
+                            <div className="flex items-center gap-2.5 pt-1.5 border-t border-white/[0.03] mt-2">
+                              {/* Copy message button */}
+                              <button
+                                type="button"
+                                onClick={() => handleCopyMessage(message.id, message.content)}
+                                className="p-1 text-zinc-500 hover:text-zinc-300 rounded hover:bg-white/[0.04] transition-all cursor-pointer"
+                                title="Copy full message"
+                              >
+                                {copiedMessageId === message.id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              {/* Assistant only actions */}
+                              {!isUser && (
+                                <>
+                                  {/* Thumbs up */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFeedback(message.id, 'up')}
+                                    className={cn(
+                                      "p-1 rounded hover:bg-white/[0.04] transition-all cursor-pointer",
+                                      feedbackMap[message.id] === 'up' ? "text-emerald-400" : "text-zinc-500 hover:text-zinc-300"
+                                    )}
+                                    title="Thumbs up"
+                                  >
+                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Thumbs down */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFeedback(message.id, 'down')}
+                                    className={cn(
+                                      "p-1 rounded hover:bg-white/[0.04] transition-all cursor-pointer",
+                                      feedbackMap[message.id] === 'down' ? "text-red-400" : "text-zinc-500 hover:text-zinc-300"
+                                    )}
+                                    title="Thumbs down"
+                                  >
+                                    <ThumbsDown className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Regenerate if it's the last assistant message */}
+                                  {msgIndex === messages.length - 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={handleRegenerate}
+                                      className="p-1 text-zinc-500 hover:text-blue-400 rounded hover:bg-white/[0.04] transition-all ml-auto cursor-pointer"
+                                      title="Regenerate response"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
@@ -309,17 +556,21 @@ export const Chat: React.FC = () => {
                   !hasApiKey && "opacity-50 cursor-not-allowed bg-zinc-950/20"
                 )}>
                   <textarea
+                    ref={textareaRef}
                     rows={1}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onInput={handleTextareaInput}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSend(e);
+                        // Reset textarea height
+                        if (textareaRef.current) textareaRef.current.style.height = 'auto';
                       }
                     }}
                     placeholder={hasApiKey ? "Ask CodexRAG a question about your code or index..." : "Please configure your LLM API key in profile settings to chat..."}
-                    className="flex-grow px-4 py-3 text-sm bg-transparent border-0 text-zinc-200 placeholder-zinc-500 focus:outline-none resize-none max-h-24 min-h-[44px]"
+                    className="flex-grow px-4 py-3 text-sm bg-transparent border-0 text-zinc-200 placeholder-zinc-500 focus:outline-none resize-none min-h-[44px] max-h-[160px] transition-[height] duration-150"
                     disabled={isStreaming || !hasApiKey}
                   />
 

@@ -40,27 +40,99 @@
   }
 }
 
-/* Minimalist Card & Panel classes - Flat style */
+/* ═══════════════════════════════════════════════════════════════
+   Glassmorphism Card & Panel System
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Base glassmorphism card — translucent with backdrop blur */
 .minimal-card {
-  background-color: #0d0d10; /* Solid dark grey */
-  border: 1px solid #1c1c21; /* Solid thin border */
-  border-radius: 8px;
+  background: rgba(13, 13, 16, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 4px 24px -4px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.minimal-card-hover:hover {
-  border-color: #2e2e36;
-  background-color: #111115;
-  transition: all 0.2s ease-in-out;
+.minimal-card-hover:hover,
+.minimal-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(17, 17, 21, 0.75);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 8px 32px -4px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
 }
 
-/* Minimalist navigation links */
+/* Gradient border accent card — used for highlighted sections */
+.glass-card-accent {
+  position: relative;
+  background: rgba(13, 13, 16, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+.glass-card-accent::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(139, 92, 246, 0.15) 50%,
+    rgba(59, 130, 246, 0.05) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Depth shadow utilities */
+.shadow-depth-1 {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.shadow-depth-2 {
+  box-shadow:
+    0 4px 16px -2px rgba(0, 0, 0, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.shadow-depth-3 {
+  box-shadow:
+    0 8px 32px -4px rgba(0, 0, 0, 0.5),
+    0 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Navigation
+   ═══════════════════════════════════════════════════════════════ */
+
 .nav-link-active {
   background-color: #17171c !important;
   color: #ffffff !important;
   border-left: 2px solid #3b82f6;
 }
 
-/* Status Badges - Flat Pill Style */
+/* ═══════════════════════════════════════════════════════════════
+   Status Badges — Glassmorphism Pill Style
+   ═══════════════════════════════════════════════════════════════ */
+
 .badge-synced {
   display: inline-flex;
   align-items: center;
@@ -69,9 +141,11 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 9999px;
-  background-color: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
+  backdrop-filter: blur(8px);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 0 12px -4px rgba(16, 185, 129, 0.15);
 }
 
 .badge-syncing {
@@ -82,9 +156,11 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 9999px;
-  background-color: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
+  backdrop-filter: blur(8px);
   color: #f59e0b;
   border: 1px solid rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 12px -4px rgba(245, 158, 11, 0.15);
 }
 
 .badge-error {
@@ -95,9 +171,11 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: 9999px;
-  background-color: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
+  backdrop-filter: blur(8px);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 12px -4px rgba(239, 68, 68, 0.15);
 }
 
 .badge-synced::before,
@@ -108,4 +186,62 @@
   height: 6px;
   border-radius: 9999px;
   background-color: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Message entrance */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Shimmer / skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Glow pulse for active elements */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+/* Slow pulse for streaming cursor */
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

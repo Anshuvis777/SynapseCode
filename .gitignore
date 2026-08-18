@@ -49,6 +49,7 @@ backend/storage/documents/*
 # IDE & OS
 .vscode/
 .idea/
+.ua/
 *.swp
 *.swo
 .DS_Store

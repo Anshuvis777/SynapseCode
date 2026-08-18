@@ -5,7 +5,13 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('rounded-lg border border-[#1c1c21] bg-[#0d0d10] text-zinc-100 shadow-sm transition-all duration-200 hover:border-[#2e2e36] hover:bg-[#111115]', className)}
+      className={cn(
+        'rounded-xl border border-white/[0.06] bg-[#0d0d10]/65 backdrop-blur-xl text-zinc-100 transition-all duration-300 ease-out',
+        'shadow-[0_0_0_1px_rgba(255,255,255,0.03)_inset,0_4px_24px_-4px_rgba(0,0,0,0.5),0_1px_2px_rgba(0,0,0,0.3)]',
+        'hover:border-white/[0.1] hover:bg-[#111115]/75 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_8px_32px_-4px_rgba(0,0,0,0.6),0_2px_4px_rgba(0,0,0,0.3)]',
+        'hover:-translate-y-px',
+        className
+      )}
       {...props}
     />
   )
@@ -14,7 +20,7 @@ Card.displayName = 'Card';
 
 export const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-5 border-b border-zinc-850', className)} {...props} />
+    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-5 border-b border-white/[0.05]', className)} {...props} />
   )
 );
 CardHeader.displayName = 'CardHeader';
@@ -42,7 +48,7 @@ CardContent.displayName = 'CardContent';
 
 export const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center p-5 pt-0 border-t border-zinc-850', className)} {...props} />
+    <div ref={ref} className={cn('flex items-center p-5 pt-0 border-t border-white/[0.05]', className)} {...props} />
   )
 );
 CardFooter.displayName = 'CardFooter';

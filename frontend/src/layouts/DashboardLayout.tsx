@@ -11,12 +11,15 @@ import {
   ChevronRight,
   Database,
   Terminal,
-  ShieldCheck
+  ShieldCheck,
+  Settings2,
+  Search
 } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { useChatStore } from '../store/chatStore';
 import { useRepositoryStore } from '../store/repositoryStore';
 import { Button } from '../components/ui/Button';
+import { CommandPalette } from '../components/CommandPalette';
 import { cn } from '../utils';
 
 export const DashboardLayout: React.FC = () => {
@@ -68,6 +71,8 @@ export const DashboardLayout: React.FC = () => {
     { to: '/repositories', label: 'Repositories', icon: FolderGit },
     { to: '/documents', label: 'Documents', icon: Files },
     { to: '/memory', label: 'Developer Memory', icon: Sparkles },
+    { to: '/search', label: 'Code Search', icon: Search },
+    { to: '/settings', label: 'Settings', icon: Settings2 },
   ];
 
   // Right panel removed
@@ -208,10 +213,23 @@ export const DashboardLayout: React.FC = () => {
             )}
           </div>
           
+          {/* Ctrl+K hint */}
+          <button
+            onClick={() => {
+              // Dispatch Ctrl+K to trigger command palette
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-zinc-500 hover:text-zinc-300 bg-[#0d0d10] border border-[#1c1c21] rounded-md hover:border-zinc-700 transition-all cursor-pointer"
+            title="Open Command Palette"
+          >
+            <Search className="w-3 h-3" />
+            <span>Search</span>
+            <kbd className="ml-1 px-1 py-0.5 text-[8px] font-mono font-bold bg-zinc-900 border border-zinc-800 rounded">Ctrl+K</kbd>
+          </button>
         </header>
 
         {/* Content outlet view */}
-        <div className="flex-grow overflow-hidden select-text">
+        <div className="flex-grow h-[calc(100vh-3.5rem)] overflow-hidden select-text">
           <Outlet />
         </div>
       </main>
@@ -298,6 +316,9 @@ export const DashboardLayout: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 4. COMMAND PALETTE (Ctrl+K) */}
+      <CommandPalette />
 
     </div>
   );
