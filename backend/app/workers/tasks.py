@@ -48,8 +48,24 @@ def _run_async(coro_factory: Callable[[], Awaitable[_T]]) -> _T:
     return _get_worker_loop().run_until_complete(coro_factory())
 
 
-async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID, embedding_api_key: str | None = None) -> bool:
+async def _async_index_repository(
+    repo_id: uuid.UUID, user_id: uuid.UUID, embedding_api_key: str | None = None
+) -> bool:
     """Async implementation of the repository indexing pipeline."""
+    # Observability: trace indexing
+    index_trace: object | None = None
+    try:
+        from app.utils.observability import langfuse_trace
+
+        index_trace = langfuse_trace(
+            name="index-repository",
+            user_id=str(user_id),
+            metadata={"repository_id": str(repo_id)},
+            input_data={"repository_id": str(repo_id)},
+        )
+    except Exception:
+        index_trace = None
+
     async with AsyncSessionLocal() as db:
         # 1. Fetch Repository metadata
         repo = await db.get(Repository, repo_id)
@@ -135,10 +151,37 @@ async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID, embedd
                 shutil.rmtree(cloned_dir)
 
             logger.info(f"Successfully completed indexing repo {repo.name}")
+            if index_trace is not None:
+                try:
+                    from app.utils.observability import langfuse_score
+
+                    index_trace.update(
+                        output={
+                            "status": "completed",
+                            "files": len(unique_files),
+                            "chunks": len(chunks),
+                        }
+                    )  # type: ignore[attr-defined]
+                    langfuse_score(index_trace, name="index-success", value=1.0)  # type: ignore[arg-type]
+                except Exception:
+                    pass
+                try:
+                    from app.utils.observability import langfuse_flush
+
+                    langfuse_flush()
+                except Exception:
+                    pass
             return True
 
         except Exception as e:
             logger.error(f"Failed indexing repo {repo.name}: {str(e)}")
+            if index_trace is not None:
+                try:
+                    from app.utils.observability import langfuse_score
+
+                    langfuse_score(index_trace, name="index-success", value=0.0, comment=str(e))  # type: ignore[arg-type]
+                except Exception:
+                    pass
             # Rollback transaction and mark failed
             await db.rollback()
             repo.status = "failed"
@@ -155,7 +198,9 @@ async def _async_index_repository(repo_id: uuid.UUID, user_id: uuid.UUID, embedd
 
 
 @celery_app.task(name="app.workers.tasks.index_repository_task", bind=True, max_retries=3)
-def index_repository_task(self, repo_id_str: str, user_id_str: str, embedding_api_key: str | None = None) -> bool:
+def index_repository_task(
+    self, repo_id_str: str, user_id_str: str, embedding_api_key: str | None = None
+) -> bool:
     """
     Celery background worker entry point.
     Runs the async pipeline inside an asyncio event loop.
@@ -164,7 +209,9 @@ def index_repository_task(self, repo_id_str: str, user_id_str: str, embedding_ap
     user_id = uuid.UUID(user_id_str)
 
     # Run async pipeline on the worker's persistent event loop
-    return _run_async(lambda: _async_index_repository(repo_id, user_id, embedding_api_key=embedding_api_key))
+    return _run_async(
+        lambda: _async_index_repository(repo_id, user_id, embedding_api_key=embedding_api_key)
+    )
 
 
 async def _async_process_document(doc_id: uuid.UUID, embedding_api_key: str | None = None) -> bool:

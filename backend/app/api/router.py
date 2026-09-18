@@ -35,3 +35,8 @@ api_router.include_router(search_router, prefix="/search", tags=["search"])
 from app.api.memory import router as memory_router
 
 api_router.include_router(memory_router, prefix="/memories", tags=["memory"])
+
+# ── Module 14: Multi-Agent Orchestration (LangGraph + MCP) ───────────
+from app.api.agents import router as agents_router
+
+api_router.include_router(agents_router, prefix="/agents", tags=["agents"])

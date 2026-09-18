@@ -78,13 +78,13 @@ async def test_search_codebase_success(
     assert data[0]["language"] == "javascript"
     assert data[0]["score"] == 0.85
 
-    # Verify retrieval called with correct parameters
-    mock_retrieval.retrieve_context.assert_called_once_with(
-        user_id=mock_user.id,
-        repository_id=repo_id,
-        query="express server setup",
-        limit=5,
-    )
+    # Verify retrieval called with correct parameters (allow embedding_api_key & parent_trace)
+    mock_retrieval.retrieve_context.assert_called_once()
+    call_kwargs = mock_retrieval.retrieve_context.call_args.kwargs
+    assert call_kwargs["user_id"] == mock_user.id
+    assert call_kwargs["repository_id"] == repo_id
+    assert call_kwargs["query"] == "express server setup"
+    assert call_kwargs["limit"] == 5
 
 
 @pytest.mark.asyncio

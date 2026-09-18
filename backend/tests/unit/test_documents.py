@@ -64,8 +64,9 @@ async def test_upload_document_success(
     assert data["status"] == "processing"
     assert "id" in data
 
-    # Verify background Celery task was triggered
-    mock_task.delay.assert_called_once_with(data["id"])
+    # Verify background Celery task was triggered (allow embedding_api_key kwarg)
+    mock_task.delay.assert_called_once()
+    assert mock_task.delay.call_args.args[0] == data["id"]
 
 
 @pytest.mark.asyncio
@@ -97,7 +98,8 @@ async def test_ingest_url_success(
     assert "web_example.com" in data["filename"]
     assert data["status"] == "processing"
 
-    mock_task.delay.assert_called_once_with(data["id"])
+    mock_task.delay.assert_called_once()
+    assert mock_task.delay.call_args.args[0] == data["id"]
 
 
 @pytest.mark.asyncio

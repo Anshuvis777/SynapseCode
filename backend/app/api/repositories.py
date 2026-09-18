@@ -83,7 +83,9 @@ async def create_repository(
     await db.flush()
 
     # Trigger background Celery indexing task
-    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key)
+    index_repository_task.delay(
+        str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key
+    )
 
     logger.info("repository_created", repo_id=str(repo.id), repo_name=repo.name)
     return repo
@@ -229,7 +231,9 @@ async def reindex_repository(
         logger.warning("failed_to_clear_vectors_before_reindex", repo_id=str(repo_id), error=str(e))
 
     # Re-trigger indexing task
-    index_repository_task.delay(str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key)
+    index_repository_task.delay(
+        str(repo.id), str(current_user.id), embedding_api_key=x_embedding_api_key
+    )
 
     logger.info("reindex_triggered", repo_id=str(repo.id))
     return repo

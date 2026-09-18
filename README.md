@@ -40,13 +40,17 @@ You can clone a GitHub repository, the system indexes it into a vector database,
 ## Features
 
 - **Repository ingestion** — clone and index GitHub repositories automatically.
-- **RAG-powered chat** — ask questions in plain English about your codebase; answers cite the relevant code.
-- **Semantic code search** — find code by meaning, not just keywords.
+- **RAG-powered chat** — ask questions in plain English about your codebase; answers cite the relevant code (SSE streaming).
+- **Multi-agent RAG** — LangGraph StateGraph: `planner → retriever → synthesizer` via `POST /api/agents/multi-agent-chat`.
+- **MCP tool-calling** — function tools (`qdrant_search`, `memory_search`, `file_read`) with JSON traces (`GET /api/agents/mcp-trace`).
+- **Semantic code search** — find code by meaning, not just keywords (lexical re-ranking boost).
 - **Persistent memory** — store and recall cross-repository insights.
-- **Multi-provider LLM support** — Groq (free, recommended), Ollama (100% local), or OpenAI.
-- **Local embeddings** — fastembed (default, low RAM) or Ollama.
+- **Multi-provider LLM support** — Gemini (free, default), Groq (free), Ollama (100% local), or OpenAI.
+- **Local + cloud embeddings** — FastEmbed (default, low RAM), Gemini, OpenAI, or Ollama.
+- **Observability** — Langfuse traces (`rag-query`, `qdrant-retrieval`, `multi-agent-rag`) + `citation-precision` scores; LangSmith optional.
 - **File upload** — index PDF and DOCX documents alongside code.
 - **JWT authentication** — secure login and token-based API access.
+- **Next.js proxy** — `examples/nextjs-proxy/app/api/rag/route.ts` wraps FastAPI SSE for a Next.js 14 dashboard.
 - **Full text + vector hybrid retrieval** for high-quality grounding.
 
 ---
@@ -96,19 +100,24 @@ You can clone a GitHub repository, the system indexes it into a vector database,
 | Vector DB | Qdrant |
 | Cache / Broker | Redis 7 |
 | Background jobs | Celery |
-| LLM providers | Groq, Ollama, OpenAI |
-| Embeddings | FastEmbed (local) / Ollama |
+| LLM providers | Groq (Gemini via OpenAI compat), OpenAI, Ollama |
+| Embeddings | FastEmbed (local) / Gemini / OpenAI / Ollama |
+| Orchestration | LangGraph (StateGraph) — planner → retriever → synthesizer |
+| Tool-calling | MCP-compatible function tools (`qdrant_search`, `memory_search`) |
+| Observability | Langfuse (traces: `rag-query`, `qdrant-retrieval`; scores: `citation-precision`) + LangSmith |
+| Streaming | SSE (`text/event-stream`) for chat completions |
 | Auth | JWT, passlib/bcrypt |
 | Parsing | tree-sitter, pypdf, python-docx |
 | Code parsing | tree-sitter |
 | Testing | pytest, pytest-asyncio, pytest-cov |
-| Lint / Types | Ruff, mypy |
+| Lint / Types | Ruff, mypy (strict) |
 
 ### Frontend
 | Layer | Technology |
 |-------|------------|
-| Framework | React 19, TypeScript |
-| Build | Vite 8 |
+| Framework | React 19, TypeScript (Vite) — primary; Next.js 14 App Router wrapper in `examples/nextjs-proxy` |
+| Build | Vite 8 (frontend), Next.js 14 (`examples/nextjs-proxy/app/api/rag/route.ts` pipes SSE to FastAPI) |
+| Stack | TypeScript, Next.js, Node.js, Python, FastAPI, Qdrant |
 | Styling | Tailwind CSS 4 |
 | Routing | React Router 7 |
 | Data fetching | TanStack Query, Axios |
@@ -335,9 +344,10 @@ All routes are mounted under `/api`:
 | `/api/providers` | LLM/embedding provider status |
 | `/api/repos` | Repository CRUD + indexing status |
 | `/api/documents` | Document upload + indexing |
-| `/api/chat` | Chat completions (RAG) |
+| `/api/chat` | Chat completions (RAG, SSE + Langfuse `rag-query` trace) |
 | `/api/search` | Semantic search |
 | `/api/memories` | Persistent memory CRUD |
+| `/api/agents` | Multi-agent RAG (`/multi-agent-chat`), MCP tools (`/tools`, `/mcp-trace`) |
 
 Authentication: send `Authorization: Bearer <JWT>` for protected routes.
 
@@ -426,8 +436,58 @@ npm run lint
 
 ---
 
+## Observability & Evaluation
+
+SynapseCode ships with **Langfuse** (and optional **LangSmith**) tracing:
+
+```bash
+pip install langfuse           # already in pyproject.toml
+# backend/.env
+LANGFUSE_ENABLED=true
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+Instrumented spans:
+- `rag-query` (trace) on `POST /api/chat/sessions/{id}/messages`
+  - child `qdrant-retrieval` span (retrieval latency, chunks, scores)
+  - child `llm-generation` span (model, input/output tokens)
+  - scores: `citation-precision` (file_path recall) + `grounded-answer` (binary)
+- `index-repository` trace on Celery indexing (`qdrant` upsert, chunk counts)
+- `multi-agent-rag` trace on `POST /api/agents/multi-agent-chat`
+  - `multi-agent-retrieval` + `synthesizer-generation` spans
+
+Code: `backend/app/utils/observability.py` (`@observe` decorator, `langfuse_trace/span/generation/score` helpers).
+
+MCP tool-calling demo:
+
+```bash
+curl http://localhost:8000/api/agents/mcp-trace | jq
+curl http://localhost:8000/api/agents/tools | jq
+# See backend/app/services/agents.py :: MCP_TOOLS + get_mcp_trace_example()
+```
+
+Example trace JSON:
+
+```json
+{
+  "trace_id": "trace_mcp_9f3a",
+  "query": "How does JWT auth work?",
+  "tool_calls": [
+    {"function": {"name": "qdrant_search", "arguments": "{\"query\": \"JWT authentication\"}"}, "result": {"chunks": 6, "top_score": 0.89}}
+  ],
+  "langfuse": {"trace": "rag-query", "spans": ["qdrant-retrieval", "llm-generation"], "scores": {"citation-precision": 0.83}}
+}
+```
+
+Screenshot checklist for portfolio: push code → set env → run a chat → open Langfuse cloud dashboard → screenshot traces/scores and add to README.
+
 ## Roadmap
 
+- [x] Langfuse + LangSmith tracing & eval (exposed via `citation-precision`)
+- [x] Multi-agent orchestration (LangGraph StateGraph: planner→retriever→synthesizer)
+- [x] Next.js 14 proxy (`examples/nextjs-proxy`) + MCP tool-calling demo
 - [ ] Multi-user workspaces and sharing
 - [ ] Incremental re-indexing on repo updates
 - [ ] Webhook-triggered sync with GitHub

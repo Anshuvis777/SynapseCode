@@ -79,10 +79,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.info("embedding_provider_ready", model=settings.active_embedding_model)
 
+    # Observability — init Langfuse if enabled
+    if settings.is_langfuse_enabled:
+        try:
+            from app.utils.observability import get_langfuse_client
+
+            client = get_langfuse_client()
+            if client is not None:
+                logger.info("langfuse_ready", host=settings.langfuse_host)
+            else:
+                logger.warning(
+                    "langfuse_unhealthy", hint="Check LANGFUSE_* keys or pip install langfuse"
+                )
+        except Exception as e:
+            logger.warning("langfuse_health_check_failed", error=str(e))
+
     yield
 
     # ── Shutdown ──
     logger.info("application_shutting_down")
+    # Flush Langfuse
+    try:
+        from app.utils.observability import langfuse_flush
+
+        langfuse_flush()
+    except Exception:
+        pass
     # Close vector store connection
     from app.storage.vector_store import vector_store
 
@@ -103,6 +125,7 @@ def create_app() -> FastAPI:
 
     class DynamicCORSMiddleware(CORSMiddleware):
         """Custom CORS middleware to allow dynamic Vercel preview domains."""
+
         def __init__(self, *args, **kwargs) -> None:
             allow_origins = kwargs.get("allow_origins", [])
             self.allow_all_origins_dynamic = False

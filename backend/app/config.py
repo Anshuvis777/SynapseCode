@@ -99,6 +99,16 @@ class Settings(BaseSettings):
     openai_embedding_model: str = Field(default="text-embedding-3-small")
     openai_embedding_dimensions: int = Field(default=1536)
 
+    # ── Observability (Langfuse + LangSmith) ─────────────────
+    langfuse_enabled: bool = Field(default=False)
+    langfuse_secret_key: str = Field(default="")
+    langfuse_public_key: str = Field(default="")
+    langfuse_host: str = Field(default="https://cloud.langfuse.com")
+    langsmith_enabled: bool = Field(default=False)
+    langsmith_api_key: str = Field(default="")
+    langsmith_project: str = Field(default="synapsecode")
+    langsmith_endpoint: str = Field(default="https://api.smith.langchain.com")
+
     # ── LLM Inference Parameters ────────────────────────────────
     llm_temperature: float = Field(default=0.1)
     # Keep low to preserve daily token budget on free tier
@@ -177,6 +187,11 @@ class Settings(BaseSettings):
                 return "ollama"  # Ollama doesn't need a real key
             case _:  # groq (default)
                 return self.groq_api_key
+
+    @property
+    def is_langfuse_enabled(self) -> bool:
+        """True when Langfuse tracing is explicitly enabled with keys."""
+        return bool(self.langfuse_enabled and self.langfuse_secret_key and self.langfuse_public_key)
 
 
 # Singleton — import this everywhere

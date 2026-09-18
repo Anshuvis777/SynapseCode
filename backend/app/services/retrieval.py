@@ -7,6 +7,7 @@ performs keyword-based scoring adjustment, and formats the output
 as context blocks for LLM prompt ingestion.
 """
 
+import time
 import uuid
 from typing import Any
 
@@ -34,6 +35,7 @@ class RetrievalService:
         query: str,
         limit: int = 6,
         embedding_api_key: str | None = None,
+        parent_trace: Any | None = None,
     ) -> list[dict[str, Any]]:
         """
         Embed the user query, execute semantic search in Qdrant,
@@ -46,8 +48,32 @@ class RetrievalService:
 
         logger.info("retrieving_context", repo_id=str(repository_id), query=query)
 
+        # Observability: child span for qdrant-retrieval under parent trace
+        retrieval_span: Any | None = None
+        t0 = time.perf_counter()
+        if parent_trace is not None:
+            try:
+                from app.utils.observability import langfuse_span
+
+                retrieval_span = langfuse_span(
+                    parent_trace,
+                    name="qdrant-retrieval",
+                    input_data={
+                        "query": query,
+                        "repository_id": str(repository_id) if repository_id else None,
+                        "limit": limit,
+                    },
+                    metadata={"user_id": str(user_id)},
+                )
+            except Exception:
+                retrieval_span = None
+
         # 1. Embed query
-        provider = get_embedding_provider(api_key=embedding_api_key) if embedding_api_key else self.embedding_provider
+        provider = (
+            get_embedding_provider(api_key=embedding_api_key)
+            if embedding_api_key
+            else self.embedding_provider
+        )
         query_vector = await provider.embed_text(query)
 
         # 2. Query Qdrant with tenant isolation
@@ -103,6 +129,30 @@ class RetrievalService:
         scored_chunks.sort(key=lambda x: x["score"], reverse=True)
         final_chunks = scored_chunks[:limit]
 
+        if retrieval_span is not None:
+            try:
+                from app.utils.observability import langfuse_update_span
+
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                langfuse_update_span(
+                    retrieval_span,
+                    output_data={
+                        "chunks_returned": len(final_chunks),
+                        "top_score": final_chunks[0]["score"] if final_chunks else 0,
+                        "chunks": [
+                            {
+                                k: c[k]
+                                for k in ("file_path", "score", "start_line", "end_line")
+                                if k in c
+                            }
+                            for c in final_chunks
+                        ],
+                    },
+                    metadata={"latency_ms": round(elapsed_ms, 2)},
+                )
+            except Exception:
+                pass
+
         return final_chunks
 
     def format_context_prompt(self, chunks: list[dict[str, Any]]) -> str:
@@ -137,14 +187,37 @@ class RetrievalService:
         query: str,
         limit: int = 6,
         embedding_api_key: str | None = None,
+        parent_trace: Any | None = None,
     ) -> list[dict[str, Any]]:
         """
         Embed the user query, search in Qdrant specifically for document chunks, and return chunks.
         """
-        logger.info("retrieving_document_context", doc_id=str(document_id), filename=document_filename, query=query)
+        logger.info(
+            "retrieving_document_context",
+            doc_id=str(document_id),
+            filename=document_filename,
+            query=query,
+        )
+
+        doc_span: Any | None = None
+        if parent_trace is not None:
+            try:
+                from app.utils.observability import langfuse_span
+
+                doc_span = langfuse_span(
+                    parent_trace,
+                    name="qdrant-document-retrieval",
+                    input_data={"query": query, "document_id": str(document_id), "limit": limit},
+                )
+            except Exception:
+                doc_span = None
 
         # 1. Embed query
-        provider = get_embedding_provider(api_key=embedding_api_key) if embedding_api_key else self.embedding_provider
+        provider = (
+            get_embedding_provider(api_key=embedding_api_key)
+            if embedding_api_key
+            else self.embedding_provider
+        )
         query_vector = await provider.embed_text(query)
 
         # 2. Query Qdrant with document filter
@@ -156,5 +229,12 @@ class RetrievalService:
             limit=limit,
         )
 
-        return chunks
+        if doc_span is not None:
+            try:
+                from app.utils.observability import langfuse_update_span
 
+                langfuse_update_span(doc_span, output_data={"chunks_returned": len(chunks)})
+            except Exception:
+                pass
+
+        return chunks

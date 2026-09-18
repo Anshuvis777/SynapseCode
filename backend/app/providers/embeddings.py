@@ -217,26 +217,26 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     def _embed_batch_sync(self, texts: list[str]) -> list[list[float]]:
         import json
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         cleaned = [t.strip() for t in texts]
         if not cleaned:
             return []
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model.split('/')[-1]}:batchEmbedContents?key={self._api_key}"
-        
+
         # Build batch requests payload
         requests_payload = []
         for text in cleaned:
-            requests_payload.append({
-                "model": f"models/{self._model.split('/')[-1]}",
-                "content": {
-                    "parts": [{"text": text or "empty"}]
-                },
-                "outputDimensionality": self._dims
-            })
-            
+            requests_payload.append(
+                {
+                    "model": f"models/{self._model.split('/')[-1]}",
+                    "content": {"parts": [{"text": text or "empty"}]},
+                    "outputDimensionality": self._dims,
+                }
+            )
+
         payload = json.dumps({"requests": requests_payload}).encode("utf-8")
         req = urllib.request.Request(
             url,

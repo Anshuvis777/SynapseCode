@@ -41,6 +41,7 @@ def _create_llm_provider(provider: str | None = None, api_key: str | None = None
             class GeminiLLMProvider(OpenAIProvider):
                 def __init__(self, api_key: str | None = None) -> None:
                     from openai import AsyncOpenAI
+
                     self._client = AsyncOpenAI(
                         api_key=api_key or settings.gemini_api_key,
                         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -111,7 +112,9 @@ def get_llm_provider(provider: str | None = None, api_key: str | None = None) ->
     return _get_cached_llm_provider()
 
 
-def _create_embedding_provider(provider: str | None = None, api_key: str | None = None) -> EmbeddingProvider:
+def _create_embedding_provider(
+    provider: str | None = None, api_key: str | None = None
+) -> EmbeddingProvider:
     provider_name = (provider or settings.embedding_provider).lower()
 
     if provider_name == "openai":
@@ -145,6 +148,7 @@ def _create_embedding_provider(provider: str | None = None, api_key: str | None 
         )
         key = api_key or settings.gemini_api_key
         from app.providers.embeddings import GeminiEmbeddingProvider
+
         return GeminiEmbeddingProvider(api_key=key)
 
 
@@ -153,7 +157,9 @@ def _get_cached_embedding_provider() -> EmbeddingProvider:
     return _create_embedding_provider()
 
 
-def get_embedding_provider(provider: str | None = None, api_key: str | None = None) -> EmbeddingProvider:
+def get_embedding_provider(
+    provider: str | None = None, api_key: str | None = None
+) -> EmbeddingProvider:
     """
     Return the configured Embedding provider.
     If a custom provider or api_key is supplied, return a new provider instance.

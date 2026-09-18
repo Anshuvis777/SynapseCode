@@ -62,7 +62,7 @@ class QdrantVectorStore:
                             distance=rest_models.Distance.COSINE,
                         ),
                     )
-                
+
                 # Idempotently ensure payload indexes exist (even for pre-existing collections)
                 if collection_name == self.collection_chunks:
                     for field in ["user_id", "repository_id", "document_id", "file_path"]:
@@ -73,7 +73,9 @@ class QdrantVectorStore:
                                 field_schema=rest_models.PayloadSchemaType.KEYWORD,
                             )
                         except Exception as e:
-                            logger.debug("payload_index_exists_or_failed", field=field, error=str(e))
+                            logger.debug(
+                                "payload_index_exists_or_failed", field=field, error=str(e)
+                            )
                 elif collection_name == self.collection_memories:
                     try:
                         await self.client.create_payload_index(
@@ -82,7 +84,9 @@ class QdrantVectorStore:
                             field_schema=rest_models.PayloadSchemaType.KEYWORD,
                         )
                     except Exception as e:
-                        logger.debug("payload_index_exists_or_failed", field="user_id", error=str(e))
+                        logger.debug(
+                            "payload_index_exists_or_failed", field="user_id", error=str(e)
+                        )
             except UnexpectedResponse as e:
                 logger.error(
                     "qdrant_collection_init_failed", collection=collection_name, error=str(e)
@@ -211,7 +215,7 @@ class QdrantVectorStore:
                 match=rest_models.MatchValue(value=str(user_id)),
             )
         ]
-        
+
         # Support searching by document_id OR filename for backward compatibility
         should_filters = [
             rest_models.FieldCondition(
@@ -223,7 +227,7 @@ class QdrantVectorStore:
                 match=rest_models.MatchValue(value=document_filename),
             ),
         ]
-        
+
         # Nest the OR (should) filters inside the must list to guarantee at least one matches
         must_filters.append(rest_models.Filter(should=should_filters))
 

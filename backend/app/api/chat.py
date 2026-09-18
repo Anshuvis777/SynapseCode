@@ -12,6 +12,7 @@ Endpoints:
 import json
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_current_user
+from app.config import settings
 from app.models.message import Message
 from app.models.session import Session
 from app.models.user import User
@@ -184,7 +186,12 @@ async def update_session(
 
     await db.commit()
     await db.refresh(session)
-    logger.info("chat_session_updated", session_id=str(session_id), repo_id=str(session.repo_id), doc_id=str(session.doc_id))
+    logger.info(
+        "chat_session_updated",
+        session_id=str(session_id),
+        repo_id=str(session.repo_id),
+        doc_id=str(session.doc_id),
+    )
     return session
 
 
@@ -233,7 +240,27 @@ async def send_message(
     db.add(user_msg)
     await db.flush()
 
-    # 3. Retrieve relevant repository or document context ONLY if session has an attached repository/document
+    # 3. Observability — start Langfuse trace for the full RAG query
+    rag_trace: Any = None  # type: ignore[no-redef]
+    try:
+        from app.utils.observability import langfuse_trace
+
+        rag_trace = langfuse_trace(
+            name="rag-query",
+            user_id=str(current_user.id),
+            session_id=str(session_id),
+            metadata={
+                "repository_id": str(session.repo_id) if session.repo_id else None,
+                "document_id": str(session.doc_id) if session.doc_id else None,
+                "llm_provider": x_llm_provider or settings.llm_provider,
+                "llm_model": settings.active_llm_model,
+            },
+            input_data=payload.content,
+        )
+    except Exception:
+        rag_trace = None
+
+    # 4. Retrieve relevant repository or document context ONLY if session has an attached repository/document
     chunks = []
     if session.repo_id is not None:
         chunks = await retrieval_service.retrieve_context(
@@ -241,9 +268,11 @@ async def send_message(
             repository_id=session.repo_id,
             query=payload.content,
             embedding_api_key=x_embedding_api_key,
+            parent_trace=rag_trace,
         )
     elif session.doc_id is not None:
         from app.models.document import Document
+
         doc = await db.get(Document, session.doc_id)
         if doc:
             chunks = await retrieval_service.retrieve_document_context(
@@ -252,10 +281,11 @@ async def send_message(
                 document_filename=doc.filename,
                 query=payload.content,
                 embedding_api_key=x_embedding_api_key,
+                parent_trace=rag_trace,
             )
     context_str = retrieval_service.format_context_prompt(chunks) if chunks else ""
 
-    # 4. Fetch long-term developer memories from Qdrant
+    # 5. Fetch long-term developer memories from Qdrant
     memories_str = ""
     try:
         embedder = get_embedding_provider(api_key=x_embedding_api_key)
@@ -317,11 +347,32 @@ async def send_message(
     # Add current query
     llm_messages.append(LLMMessage(role="user", content=payload.content))
 
-    # 5. Define streaming generator
+    # 6. Define streaming generator with Langfuse generation + scoring
     async def sse_generator() -> AsyncGenerator[str, None]:
         llm = get_llm_provider(provider=x_llm_provider, api_key=x_llm_api_key)
-        full_response = []
+        full_response: list[str] = []
         assistant_msg_id = uuid.uuid4()
+        generation: Any | None = None
+        # Estimate tokens upfront for observability metadata
+        prompt_len = sum(len(m.content or "") for m in llm_messages)
+        est_input_tokens = prompt_len // 4
+        # Create generation observation under the rag trace
+        if rag_trace is not None:
+            try:
+                from app.utils.observability import langfuse_generation
+
+                generation = langfuse_generation(
+                    rag_trace,
+                    name="llm-generation",
+                    model=getattr(llm, "_model", settings.active_llm_model),
+                    input_data=[
+                        {"role": m.role, "content": m.content[:2000]} for m in llm_messages
+                    ],
+                    metadata={"stream": True, "chunks_retrieved": len(chunks)},
+                    usage={"input": est_input_tokens},
+                )
+            except Exception:
+                generation = None
 
         try:
             # Yield code context metadata to frontend first so user knows what files were used
@@ -344,14 +395,11 @@ async def send_message(
 
             # Save assistant message to DB
             assistant_content = "".join(full_response)
+            input_tokens = est_input_tokens
+            output_tokens = len(assistant_content) // 4
             if assistant_content.strip():
                 # Write to DB using a dedicated session since get_db might close before generator finishes
                 async with AsyncSessionLocal() as write_db:
-                    # Estimate token counts (approx 4 chars per token)
-                    prompt_len = sum(len(m.content or "") for m in llm_messages)
-                    input_tokens = prompt_len // 4
-                    output_tokens = len(assistant_content) // 4
-
                     assistant_msg = Message(
                         id=assistant_msg_id,
                         session_id=session_id,
@@ -368,11 +416,65 @@ async def send_message(
                         session_to_update.title = session_to_update.title  # force trigger change
                     await write_db.commit()
 
+            # Langfuse: update generation + score citation precision
+            if generation is not None:
+                try:
+                    from app.utils.observability import (
+                        compute_citation_precision,
+                        langfuse_score,
+                        langfuse_update_generation,
+                    )
+
+                    langfuse_update_generation(
+                        generation,
+                        output_data=assistant_content,
+                        usage={"input": input_tokens, "output": output_tokens, "unit": "TOKENS"},
+                        metadata={"done": True},
+                    )
+                    if rag_trace is not None and chunks:
+                        precision = compute_citation_precision(chunks, assistant_content)
+                        langfuse_score(
+                            rag_trace,
+                            name="citation-precision",
+                            value=precision,
+                            comment="file_path citation recall",
+                        )
+                        langfuse_score(
+                            rag_trace,
+                            name="grounded-answer",
+                            value=1.0 if precision > 0 else 0.0,
+                            comment="binary grounded check",
+                        )
+                except Exception:
+                    pass
+                try:
+                    from app.utils.observability import langfuse_flush
+
+                    langfuse_flush()
+                except Exception:
+                    pass
+
+            # Also update rag trace output
+            if rag_trace is not None:
+                try:
+                    rag_trace.update(output=assistant_content)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+
             # Final SSE completion packet
             yield f"data: {json.dumps({'done': True, 'message_id': str(assistant_msg_id), 'tokens_used': {'prompt': input_tokens, 'completion': output_tokens, 'total': input_tokens + output_tokens}})}\n\n"
 
         except Exception as e:
             logger.error("sse_streaming_failed", error=str(e))
+            if generation is not None:
+                try:
+                    from app.utils.observability import langfuse_update_generation
+
+                    langfuse_update_generation(
+                        generation, output_data=f"error: {str(e)}", metadata={"error": True}
+                    )
+                except Exception:
+                    pass
             yield f"data: {json.dumps({'error': 'An error occurred during response generation.'})}\n\n"
 
     # Commit the user message to Postgres first

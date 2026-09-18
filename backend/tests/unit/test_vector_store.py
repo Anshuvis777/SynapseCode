@@ -23,8 +23,8 @@ async def test_init_collections(mock_client_class):
 
     # Verify create_collection was called twice (chunks and memories)
     assert mock_client.create_collection.call_count == 2
-    # Verify index creation
-    assert mock_client.create_payload_index.call_count == 3
+    # Verify index creation — code_chunks (user_id, repository_id, document_id, file_path) + memories (user_id)
+    assert mock_client.create_payload_index.call_count == 5
 
 
 @pytest.mark.asyncio
